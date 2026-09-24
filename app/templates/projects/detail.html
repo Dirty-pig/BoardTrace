@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}{{ project.name }} · {{ system_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{{ url_for('main.projects') }}">项目</a><span>›</span><span>{{ project.name }}</span></div>
+<div class="object-header">
+  <div class="object-title"><span class="object-icon">项</span><div><div class="title-line"><h1>{{ project.name }}</h1><span class="status-badge working">{{ project.status }}</span></div><p>{{ project.objective or '暂无项目目标' }}</p></div></div>
+  <div class="object-actions"><button class="secondary-button" data-modal-open="projectPcbsModal">管理板卡</button></div>
+</div>
+<div class="object-stats">
+  <div><span>关联板卡</span><strong>{{ project.pcbs|length }}</strong></div>
+  <div><span>关联问题</span><strong>{{ project.issues.filter_by(deleted_at=None).count() }}</strong></div>
+  <div><span>项目 Cell</span><strong>{{ project.object_cells.filter_by(deleted_at=None).count() }}</strong></div>
+  <div><span>最近更新</span><strong>{{ project.updated_at.strftime('%m-%d %H:%M') }}</strong></div>
+</div>
+<div class="detail-layout">
+  <section class="panel detail-main">
+    <div class="panel-head"><div><h2>项目 Cell</h2><p>记录项目级的进展、判断和待办</p></div></div>
+    <form class="composer object-composer" action="{{ url_for('main.project_cell_create',project_id=project.id) }}" method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="composer-toolbar"><select name="kind" aria-label="Cell 类型">{% for kind in object_cell_kinds %}<option>{{ kind }}</option>{% endfor %}</select><button type="button" data-editor-wrap="**"><b>B</b></button><button type="button" class="color-dot red" data-editor-color="red" title="红色"></button><button type="button" class="color-dot orange" data-editor-color="orange" title="橙色"></button><button type="button" class="color-dot blue" data-editor-color="blue" title="蓝色"></button><button type="button" class="color-dot green" data-editor-color="green" title="绿色"></button><button type="button" data-editor-wrap="==">▰</button></div>
+      <p class="cell-kind-hint">项目 Cell 用于分类记录，不会改动问题状态。</p>
+      <textarea name="content" id="cellEditor" placeholder="追加项目记录… 支持 Ctrl+V 粘贴图片，也可以拖入图片"></textarea>
+      <div class="upload-preview" id="uploadPreview"></div><div class="composer-foot"><div><label class="attach-button">▧ 图片/附件<input id="attachmentInput" type="file" name="attachments" multiple hidden></label><span>Markdown · 服务端安全过滤</span></div><button class="primary-button">发送 Cell</button></div>
+    </form>
+    <div class="chat-timeline">
+      {% for cell in pagination.items %}{% include '_object_cell.html' %}{% else %}<div class="empty-state">还没有项目 Cell。</div>{% endfor %}
+    </div>
+    {% include '_pagination.html' %}
+  </section>
+  <aside class="detail-side">
+    <section class="panel"><div class="panel-head"><h2>关联板卡</h2><span class="count-pill">{{ project.pcbs|length }}</span></div>{% for pcb in project.pcbs %}<a class="side-issue" href="{{ url_for('main.pcb_detail',pcb_id=pcb.id) }}"><strong>{{ pcb.model or '未填写型号' }}</strong><small>PCB序列号：{{ pcb.serial }} · {{ pcb.status }}</small></a>{% else %}<div class="empty-state small">暂未关联板卡。</div>{% endfor %}</section>
+    <section class="panel"><div class="panel-head"><h2>关联问题</h2><span class="count-pill">{{ project.issues.filter_by(deleted_at=None).count() }}</span></div>{% for issue in issues %}<a class="side-issue {{ 'high' if issue.priority=='高' }}" href="{{ url_for('main.issue_detail',issue_id=issue.id) }}"><strong>{{ issue.title }}</strong><small>{{ issue.priority }} · {{ issue.status }}</small></a>{% else %}<div class="empty-state small">暂无问题。</div>{% endfor %}</section>
+  </aside>
+</div>
+<div class="modal-backdrop" id="projectPcbsModal" aria-hidden="true"><section class="modal"><div class="modal-head"><div><span class="eyebrow">PROJECT PCBS</span><h2>管理关联板卡</h2></div><button type="button" class="close-button" data-modal-close>×</button></div><form action="{{ url_for('main.project_pcbs_update',project_id=project.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><div class="checkbox-list">{% for pcb in pcbs %}<label class="checkbox-row"><input type="checkbox" name="pcb_ids" value="{{ pcb.id }}" {{ 'checked' if pcb in project.pcbs }}><span><strong>{{ pcb.model or '未填写型号' }}</strong><small>PCB序列号：{{ pcb.serial }} · {{ pcb.revision or '未填写版本' }}</small></span></label>{% else %}<div class="empty-state">请先创建板卡。</div>{% endfor %}</div><div class="modal-foot"><span>可同时选择多块 PCB</span><button class="primary-button">保存关联</button></div></form></section></div>
+{% endblock %}

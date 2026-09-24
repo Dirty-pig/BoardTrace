@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}回收站 · {{ system_name }}{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">RECYCLE BIN</p><h1>回收站</h1><p>删除内容保留在这里；自动永久清理关闭。</p></div></div>
+<section class="panel">
+  <div class="panel-head"><h2>Cell</h2><span class="count-pill">{{ cells|length + object_cells|length }}</span></div>
+  {% for row in cells %}
+  <div class="trash-row"><div><strong>问题：{{ row.issue.title }} · {{ row.kind }}</strong><small>{{ row.content_md[:100] or '仅附件' }} · {{ row.deleted_at|cn_time }}</small></div><form action="{{ url_for('main.trash_restore',entity='cell',entity_id=row.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="secondary-button">恢复</button></form></div>
+  {% endfor %}
+  {% for row in object_cells %}
+  <div class="trash-row"><div><strong>{{ ('项目：' ~ row.project.name) if row.project else ('板卡：' ~ (row.pcb.model or row.pcb.serial)) }} · {{ row.kind }}</strong><small>{{ row.content_md[:100] or '仅附件' }} · {{ row.deleted_at|cn_time }}</small></div><form action="{{ url_for('main.trash_restore',entity='object_cell',entity_id=row.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="secondary-button">恢复</button></form></div>
+  {% endfor %}
+  {% if not cells and not object_cells %}<div class="empty-state small">没有已删除 Cell。</div>{% endif %}
+</section>
+<section class="panel section-gap">
+  <div class="panel-head"><h2>PCB</h2><span class="count-pill">{{ pcbs|length }}</span></div>
+  {% for row in pcbs %}<div class="trash-row"><div><strong>{{ row.model or row.serial }}</strong><small>PCB序列号：{{ row.serial }} · {{ row.deleted_at|cn_time }}</small></div><form action="{{ url_for('main.trash_restore',entity='pcb',entity_id=row.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="secondary-button">恢复</button></form></div>{% else %}<div class="empty-state small">没有已删除 PCB。</div>{% endfor %}
+</section>
+<section class="panel section-gap">
+  <div class="panel-head"><h2>问题</h2><span class="count-pill">{{ issues|length }}</span></div>
+  {% for row in issues %}<div class="trash-row"><div><strong>{{ row.title }}</strong><small>{{ row.deleted_at|cn_time }}</small></div><form action="{{ url_for('main.trash_restore',entity='issue',entity_id=row.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="secondary-button">恢复</button></form></div>{% else %}<div class="empty-state small">没有已删除问题。</div>{% endfor %}
+</section>
+{% endblock %}

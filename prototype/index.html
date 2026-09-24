@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>板迹 · 轻量问题系统原型</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">板</div>
+        <div><strong>板迹</strong><span>轻量问题系统</span></div>
+      </div>
+      <nav class="nav-list" aria-label="主导航">
+        <button class="nav-item active" data-view="dashboard"><span>▦</span>今日工作台</button>
+        <div class="nav-label">工作对象</div>
+        <button class="nav-item" data-view="pcb"><span>▤</span>PCB 序列号</button>
+        <button class="nav-item" data-view="projects"><span>◇</span>项目</button>
+        <button class="nav-item" data-view="issues"><span>!</span>全部问题 <b>6</b></button>
+        <button class="nav-item" data-view="inbox"><span>⌁</span>待归类 <b>2</b></button>
+        <div class="nav-label">知识与数据</div>
+        <button class="nav-item" data-view="cases"><span>✦</span>共享案例</button>
+        <button class="nav-item" data-view="trash"><span>⌫</span>回收站</button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="backup-state"><i></i><span>外置硬盘备份正常<small>今天 08:30</small></span></div>
+        <button class="profile"><span class="avatar">R</span><span>ROOT<small>本机管理员</small></span><span>•••</span></button>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div class="pcb-lookup">
+          <span class="search-icon">⌕</span>
+          <input id="pcbLookup" placeholder="快速查找 PCB 序列号…" autocomplete="off">
+          <kbd>Alt P</kbd>
+          <div class="lookup-menu" id="lookupMenu"></div>
+        </div>
+        <div class="top-actions">
+          <button class="icon-button" id="globalSearch" title="全局搜索">⌕</button>
+          <button class="timer-button" id="timerButton"><span class="timer-dot"></span><span id="timerLabel">开始计时</span></button>
+          <button class="primary-button" id="quickCreate">＋ 快速记录</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <section class="view active" id="dashboard">
+          <div class="page-heading">
+            <div><p class="eyebrow">2026年9月22日 · 星期二</p><h1>早上好，ROOT</h1><p>从最近的工作对象继续，或快速记录一个新发现。</p></div>
+            <button class="secondary-button">生成今日汇总</button>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric-card"><span>今日投入</span><strong>3h 25m</strong><small class="positive">较昨日 +45m</small></article>
+            <article class="metric-card"><span>处理中问题</span><strong>4</strong><small>其中 1 项高优先级</small></article>
+            <article class="metric-card"><span>等待中</span><strong>2</strong><small>1 项今日需跟进</small></article>
+            <article class="metric-card"><span>今日记录</span><strong>7</strong><small>3 张图片 · 4 个 Cell</small></article>
+          </div>
+
+          <div class="dashboard-grid">
+            <section class="panel span-2">
+              <div class="panel-head"><div><h2>最近 PCB</h2><p>按最近更新时间排序</p></div><button class="text-button" data-view="pcb">查看全部 →</button></div>
+              <div class="pcb-table">
+                <button class="pcb-row" data-view="pcb-detail">
+                  <span class="pcb-status working"></span><span><strong>S1485-003</strong><small>S1485 · PCB V1.1</small></span><span><em>处理中</em><small>电源质量与带载异常</small></span><span><strong>3</strong><small>未解决问题</small></span><span><strong>今天 11:42</strong><small>最近更新</small></span><b>›</b>
+                </button>
+                <button class="pcb-row" data-view="pcb-detail">
+                  <span class="pcb-status waiting"></span><span><strong>S1385-002</strong><small>S1385 · PCB V2.0</small></span><span><em>等待中</em><small>等待屏规格书</small></span><span><strong>1</strong><small>未解决问题</small></span><span><strong>昨天 17:20</strong><small>最近更新</small></span><b>›</b>
+                </button>
+                <button class="pcb-row" data-view="pcb-detail">
+                  <span class="pcb-status solved"></span><span><strong>S1246-007</strong><small>S1246 · PCB V1.3</small></span><span><em>已完成</em><small>启动异常复测完成</small></span><span><strong>0</strong><small>未解决问题</small></span><span><strong>9月18日</strong><small>最近更新</small></span><b>›</b>
+                </button>
+              </div>
+            </section>
+
+            <section class="panel focus-panel">
+              <div class="panel-head"><div><h2>下一步</h2><p>跨问题待办</p></div><span class="count-pill">4</span></div>
+              <label class="task"><input type="checkbox"><span><strong>复测 PHASE 波形</strong><small>S1485-003 · 今天</small></span></label>
+              <label class="task"><input type="checkbox"><span><strong>核对 CAN 终端电阻</strong><small>S1485-003 · 今天</small></span></label>
+              <label class="task"><input type="checkbox"><span><strong>补充改板前后照片</strong><small>S1385-002 · 明天</small></span></label>
+              <label class="task"><input type="checkbox"><span><strong>整理 JW7221 结论</strong><small>共享案例 · 本周</small></span></label>
+            </section>
+
+            <section class="panel span-2">
+              <div class="panel-head"><div><h2>今日动态</h2><p>工作、问题和 Cell 综合时间线</p></div><div class="segmented"><button class="active">全部</button><button>工作</button><button>问题</button><button>图片</button></div></div>
+              <div class="timeline compact">
+                <article class="timeline-item"><time>11:42</time><span class="timeline-icon test">测</span><div><div class="item-meta"><strong>补充测试记录</strong><a data-view="issue-detail">S1485 大电流带载异常</a></div><p>阶梯加载至 11 A 时再次触发保护，电感异响仍存在。下一步先检查 PHASE—电感路径和采样链。</p><div class="chips"><span>测试记录</span><span>S1485-003</span></div></div></article>
+                <article class="timeline-item"><time>10:18</time><span class="timeline-icon image">图</span><div><div class="item-meta"><strong>上传 3 张波形图片</strong><a data-view="issue-detail">S1485 大电流带载异常</a></div><div class="thumb-strip"><div>PHASE</div><div>GATE</div><div>VOUT</div></div></div></article>
+                <article class="timeline-item"><time>09:26</time><span class="timeline-icon work">时</span><div><div class="item-meta"><strong>结束计时 · 52分钟</strong><a>S1485-003</a></div><p>完成低电流对比测试并记录正常板与异常板差异。</p></div></article>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head"><div><h2>待归类</h2><p>稍后补充归属对象</p></div><span class="count-pill warning">2</span></div>
+              <button class="unfiled"><strong>USB偶发识别失败</strong><small>今天 08:52 · 含 1 张图片</small></button>
+              <button class="unfiled"><strong>整理电源测试注意项</strong><small>昨天 18:06 · 工作记录</small></button>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="pcb-detail">
+          <div class="breadcrumb"><button data-view="pcb">PCB 序列号</button><span>›</span><span>S1485-003</span></div>
+          <div class="object-header">
+            <div class="object-title"><span class="object-icon">PCB</span><div><div class="title-line"><h1>S1485-003</h1><span class="status-badge working">处理中</span></div><p>S1485 · PCB V1.1 · 手动录入于 2026-09-03</p></div></div>
+            <div class="object-actions"><button class="secondary-button">编辑信息</button><button class="primary-button" id="pcbAddRecord">＋ 添加记录</button></div>
+          </div>
+          <div class="object-stats"><div><span>累计投入</span><strong>18h 40m</strong></div><div><span>未解决问题</span><strong>3</strong></div><div><span>相关图片</span><strong>26</strong></div><div><span>最近更新</span><strong>今天 11:42</strong></div></div>
+
+          <div class="detail-layout">
+            <section class="panel detail-main">
+              <div class="panel-head sticky"><div><h2>综合时间线</h2><p>工作、问题、图片与结论</p></div><div class="segmented"><button class="active">全部</button><button>问题</button><button>工作</button><button>图片</button><button>结论</button></div></div>
+              <div class="date-divider"><span>今天 · 9月22日</span></div>
+              <div class="timeline">
+                <article class="timeline-item"><time>11:42</time><span class="timeline-icon test">测</span><div class="cell-card"><div class="cell-top"><div><strong>测试记录</strong><a data-view="issue-detail">大电流带载异常</a></div><button>•••</button></div><p>阶梯加载至 <b>11 A</b> 时再次触发保护，电感异响仍存在。恢复原始走线后异常未消失，暂不能只归因于临时导线寄生。</p><div class="callout warning"><b>下一步：</b>断电检查 PHASE—电感通路、焊盘铜箔和采样链，再进行低电流波形对比。</div><div class="cell-foot"><span>ROOT</span><span>编辑于 11:46</span><span class="tag orange">待验证</span></div></div></article>
+                <article class="timeline-item"><time>10:18</time><span class="timeline-icon image">图</span><div class="cell-card"><div class="cell-top"><div><strong>图片</strong><span>低电流波形对比</span></div><button>•••</button></div><div class="image-grid"><figure><div class="scope-wave"></div><figcaption>异常板 PHASE</figcaption></figure><figure><div class="scope-wave alt"></div><figcaption>正常板 PHASE</figcaption></figure><figure><div class="scope-wave third"></div><figcaption>VOUT 纹波</figcaption></figure></div><div class="cell-foot"><span>3 张原图</span><span>点击缩略图按需加载</span></div></div></article>
+                <article class="timeline-item"><time>09:26</time><span class="timeline-icon work">时</span><div class="cell-card compact-card"><div><strong>工作记录 · 52分钟</strong><p>完成正常板与异常板低电流对比，并保存关键波形。</p></div><span class="tag blue">调试</span></div></article>
+              </div>
+              <button class="load-more">加载更早的 20 条记录</button>
+            </section>
+            <aside class="detail-side">
+              <section class="panel"><div class="panel-head"><h2>板卡信息</h2><button class="text-button">编辑</button></div><dl class="meta-list"><div><dt>板卡型号</dt><dd>S1485</dd></div><div><dt>PCB 版本</dt><dd>V1.1</dd></div><div><dt>序列号</dt><dd>S1485-003</dd></div><div><dt>主要项目</dt><dd><a>S1485 电源整改</a></dd></div><div><dt>当前状态</dt><dd><span class="status-badge working">处理中</span></dd></div></dl></section>
+              <section class="panel"><div class="panel-head"><h2>未解决问题</h2><span class="count-pill">3</span></div><button class="side-issue high" data-view="issue-detail"><strong>大电流带载异常</strong><small>高优先级 · 待验证</small></button><button class="side-issue"><strong>CAN 对传无有效接收</strong><small>普通 · 处理中</small></button><button class="side-issue"><strong>电感异响</strong><small>普通 · 等待中</small></button></section>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="issue-detail">
+          <div class="breadcrumb"><button data-view="pcb-detail">S1485-003</button><span>›</span><span>问题 #128</span></div>
+          <div class="object-header issue-header">
+            <div><div class="title-line"><span class="priority high">高</span><h1>S1485 大电流带载异常</h1></div><p>创建于今天 08:47 · 最近更新 3分钟前</p></div>
+            <div class="object-actions"><select><option>待验证</option><option>未处理</option><option>处理中</option><option>等待中</option><option>已解决</option></select><button class="secondary-button">•••</button></div>
+          </div>
+          <div class="detail-layout issue-layout">
+            <section class="panel detail-main issue-stream">
+              <div class="issue-summary"><h2>当前摘要</h2><p><b>现象：</b>改动 PHASE/SW 至电感路径后，大电流下出现电感异响，复原后仍无法恢复原带载能力。</p><p><b>当前判断：</b><mark>优先排查焊盘铜箔、焊点、电感及电流采样链是否受损。</mark></p></div>
+              <div class="date-divider"><span>今天 · 9月22日</span></div>
+              <div class="chat-stream" id="chatStream">
+                <article class="chat-cell"><div class="cell-avatar">R</div><div><div class="chat-meta"><strong>ROOT</strong><time>09:03</time><span class="tag blue">现象</span></div><div class="chat-bubble"><p>原可带载约 <b>17 A</b>，OCP约26 A。串入导线后大电流下出现异响，恢复原状后约11 A即触发保护。</p></div></div></article>
+                <article class="chat-cell"><div class="cell-avatar">R</div><div><div class="chat-meta"><strong>ROOT</strong><time>10:18</time><span class="tag purple">图片</span></div><div class="chat-bubble"><p>低电流条件下保存三组对比波形：</p><div class="image-grid small"><figure><div class="scope-wave"></div><figcaption>异常板 PHASE</figcaption></figure><figure><div class="scope-wave alt"></div><figcaption>正常板 PHASE</figcaption></figure></div></div></div></article>
+                <article class="chat-cell"><div class="cell-avatar">R</div><div><div class="chat-meta"><strong>ROOT</strong><time>11:42</time><span class="tag orange">测试记录</span></div><div class="chat-bubble"><p>阶梯加载至11 A再次触发保护。<span class="text-red"><b>根因未确认前停止继续大电流抽载</b></span>，避免扩大MOSFET、电感或走线损伤。</p><blockquote>下一步：断电测量 PHASE—电感通路直流电阻，并检查可疑焊点。</blockquote></div></div></article>
+              </div>
+              <div class="composer">
+                <div class="composer-toolbar"><select id="cellType"><option>普通记录</option><option>测试记录</option><option>当前判断</option><option>下一步待办</option><option>阶段结论</option></select><button data-format="bold"><b>B</b></button><button class="color-dot red" data-color="red" title="红色"></button><button class="color-dot orange" data-color="orange" title="橙色"></button><button class="color-dot blue" data-color="blue" title="蓝色"></button><button class="color-dot green" data-color="green" title="绿色"></button><button data-format="highlight">▰</button><span></span><button>☑</button><button>↗</button></div>
+                <textarea id="cellInput" placeholder="追加一条记录… 支持 Ctrl+V 粘贴图片，也可以把图片拖到这里"></textarea>
+                <div class="upload-preview" id="uploadPreview"></div>
+                <div class="composer-foot"><div><label class="attach-button">▧ 图片/附件<input id="fileInput" type="file" accept="image/*" multiple hidden></label><span>Markdown · 自动保存草稿</span></div><button class="primary-button" id="sendCell">发送 Cell</button></div>
+              </div>
+            </section>
+            <aside class="detail-side">
+              <section class="panel"><div class="panel-head"><h2>问题信息</h2><button class="text-button">编辑</button></div><dl class="meta-list"><div><dt>主要归属</dt><dd><a data-view="pcb-detail">S1485-003</a></dd></div><div><dt>项目</dt><dd>S1485 电源整改</dd></div><div><dt>状态</dt><dd><span class="status-badge verify">待验证</span></dd></div><div><dt>优先级</dt><dd><span class="priority-text">高</span></dd></div><div><dt>累计投入</dt><dd>4h 35m</dd></div><div><dt>标签</dt><dd><span class="chips"><span>电源</span><span>带载</span><span>保护</span></span></dd></div></dl></section>
+              <section class="panel"><div class="panel-head"><h2>下一步</h2><span class="count-pill">3</span></div><label class="task"><input type="checkbox"><span><strong>测量直流电阻</strong><small>今天</small></span></label><label class="task"><input type="checkbox"><span><strong>检查焊盘铜箔</strong><small>今天</small></span></label><label class="task"><input type="checkbox"><span><strong>低电流对比波形</strong><small>明天</small></span></label></section>
+              <section class="panel ai-panel"><span>✦</span><div><strong>Codex 可读取</strong><p>通过只读 MCP 分页获取这个问题的上下文。</p><button class="text-button">查看接口预览 →</button></div></section>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view placeholder-view" id="pcb"><h1>PCB 序列号</h1><p>正式列表将在确认原型后实现。请选择示例 PCB 查看详情。</p><button class="primary-button" data-view="pcb-detail">打开 S1485-003</button></section>
+        <section class="view placeholder-view" id="projects"><h1>项目</h1><p>项目是可选归属，第一版保持轻量。</p></section>
+        <section class="view placeholder-view" id="issues"><h1>全部问题</h1><p>支持状态、优先级、PCB和日期筛选。</p><button class="primary-button" data-view="issue-detail">打开示例问题</button></section>
+        <section class="view placeholder-view" id="inbox"><h1>待归类</h1><p>快速记录后尚未选择PCB或项目的内容集中在这里。</p></section>
+        <section class="view placeholder-view" id="cases"><h1>共享案例</h1><p>由已解决问题沉淀，后期支持Codex建议标签与相似问题。</p></section>
+        <section class="view placeholder-view" id="trash"><h1>回收站</h1><p>软删除内容默认保留30天，自动永久清理默认关闭。</p></section>
+        <section class="view" id="search-view"><div class="page-heading"><div><p class="eyebrow">全局搜索</p><h1>搜索所有工作记录</h1></div></div><div class="search-page-box"><span>⌕</span><input id="searchInput" placeholder="搜索PCB、项目、问题、Cell或附件…"><button class="primary-button">搜索</button></div><div id="searchResults" class="search-results"></div></section>
+      </main>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="quickModal" aria-hidden="true">
+    <section class="modal">
+      <div class="modal-head"><div><span class="eyebrow">QUICK CAPTURE</span><h2>快速记录</h2></div><button class="close-button" id="closeModal">×</button></div>
+      <div class="record-switch"><button class="active" data-kind="问题">问题</button><button data-kind="工作记录">工作记录</button></div>
+      <label class="field"><span>标题 <b>*</b></span><input id="quickTitle" placeholder="用一句话描述当前事项"></label>
+      <label class="field"><span>归属对象</span><select><option>最近使用：S1485-003</option><option>项目：S1485 电源整改</option><option>暂不归类</option></select></label>
+      <label class="field"><span>补充内容</span><textarea placeholder="可选；创建后可继续追加Cell"></textarea></label>
+      <div class="drop-area">将图片拖到这里，或按 Ctrl+V 粘贴截图</div>
+      <div class="modal-foot"><span>只需填写标题即可创建</span><div><button class="secondary-button" id="cancelModal">取消</button><button class="primary-button" id="createRecord">创建问题</button></div></div>
+    </section>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+Flask==3.1.2
+Flask-Login==0.6.3
+Flask-SQLAlchemy==3.1.1
+Flask-WTF==1.2.2
+SQLAlchemy==2.0.43
+alembic==1.16.5
+argon2-cffi==25.1.0
+bleach==6.2.0
+Markdown==3.8.2
+Pillow==11.3.0
+waitress==3.0.2
+mcp==1.26.0
+pytest==8.4.2
+pytest-cov==6.2.1

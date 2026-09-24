@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}{{ system_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='backend.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="{{ url_for('main.dashboard') }}">
+        <div class="brand-mark">板</div>
+        <div><strong>{{ system_name }}</strong><span>轻量问题系统</span></div>
+      </a>
+      <nav class="nav-list" aria-label="主导航">
+        <a class="nav-item {{ 'active' if request.endpoint == 'main.dashboard' }}" href="{{ url_for('main.dashboard') }}"><span>▦</span>今日工作台</a>
+        <div class="nav-label">工作对象</div>
+        <a class="nav-item {{ 'active' if request.endpoint in ['main.pcbs','main.pcb_detail'] }}" href="{{ url_for('main.pcbs') }}"><span>▤</span>板卡型号</a>
+        <a class="nav-item {{ 'active' if request.endpoint in ['main.projects','main.project_detail'] }}" href="{{ url_for('main.projects') }}"><span>◇</span>项目</a>
+        <a class="nav-item {{ 'active' if request.endpoint in ['main.issues','main.issue_detail'] }}" href="{{ url_for('main.issues') }}"><span>!</span>全部问题</a>
+        <a class="nav-item {{ 'active' if request.endpoint == 'main.work_logs' }}" href="{{ url_for('main.work_logs') }}"><span>◷</span>工作记录</a>
+        <a class="nav-item {{ 'active' if request.endpoint in ['knowledge.index','knowledge.detail'] }}" href="/knowledge"><span>◈</span>知识库</a>
+        <div class="nav-label">数据与管理</div>
+        <a class="nav-item {{ 'active' if request.endpoint == 'main.search' }}" href="{{ url_for('main.search') }}"><span>⌕</span>全局搜索</a>
+        <a class="nav-item {{ 'active' if request.endpoint == 'main.trash' }}" href="{{ url_for('main.trash') }}"><span>⌫</span>回收站</a>
+        {% if current_user.role == 'root' %}<a class="nav-item {{ 'active' if request.endpoint == 'main.admin' }}" href="{{ url_for('main.admin') }}"><span>⚙</span>系统管理</a>{% endif %}
+      </nav>
+      <div class="sidebar-footer">
+        <div class="backup-state"><i></i><span>本机数据库<small>自动保存中</small></span></div>
+        <form action="{{ url_for('auth.logout') }}" method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="profile" type="submit"><span class="avatar">{{ current_user.username[:1]|upper }}</span><span>{{ current_user.username }}<small>{{ '本机管理员' if current_user.role == 'root' else '普通用户' }}</small></span><span>退出</span></button>
+        </form>
+      </div>
+    </aside>
+    <section class="workspace">
+      <header class="topbar">
+        <form class="pcb-lookup" action="{{ url_for('main.pcbs') }}" method="get">
+          <span class="search-icon">⌕</span><input name="q" id="pcbLookup" placeholder="快速查找板卡型号或 PCB 序列号…" autocomplete="off"><kbd>Alt P</kbd><div class="lookup-menu" id="lookupMenu"></div>
+        </form>
+        <div class="top-actions">
+          <a class="icon-button" href="{{ url_for('main.search') }}" title="全局搜索">⌕</a>
+          {% if active_timer %}
+          <form action="{{ url_for('main.timer_stop') }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="timer-button running"><span class="timer-dot"></span><span data-timer-start="{{ active_timer.started_at.isoformat() }}">结束计时</span></button></form>
+          {% else %}
+          <button class="timer-button" data-modal-open="timerModal"><span class="timer-dot"></span><span>开始计时</span></button>
+          {% endif %}
+          <button class="primary-button" data-modal-open="quickModal">＋ 快速记录</button>
+        </div>
+      </header>
+      <main class="content">
+        {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<div class="flash-stack" role="status" aria-live="polite">{% for category,message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}{% endwith %}
+        {% block content %}{% endblock %}
+      </main>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="quickModal" aria-hidden="true">
+    <section class="modal">
+      <div class="modal-head"><div><span class="eyebrow">QUICK CAPTURE</span><h2>快速建立问题</h2></div><button class="close-button" type="button" data-modal-close>×</button></div>
+      <form action="{{ url_for('main.issues') }}" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="field"><span>标题 <b>*</b></span><input name="title" required placeholder="用一句话描述当前问题"></label>
+        <label class="field"><span>板卡型号（可选）</span><select name="pcb_id"><option value="">暂不归类</option>{% for item in quick_pcbs|default([]) %}<option value="{{ item.id }}" {{ 'selected' if pcb is defined and pcb.id == item.id }}>{{ item.model or '未填写型号' }} · PCB序列号：{{ item.serial }}</option>{% endfor %}</select></label>
+        <label class="field"><span>现象（可选）</span><textarea name="description" placeholder="创建后可继续追加Cell"></textarea></label>
+        <div class="modal-foot"><span>只需填写标题即可创建</span><div><button class="secondary-button" type="button" data-modal-close>取消</button><button class="primary-button" type="submit">创建问题</button></div></div>
+      </form>
+    </section>
+  </div>
+  <div class="modal-backdrop" id="timerModal" aria-hidden="true">
+    <section class="modal small-modal">
+      <div class="modal-head"><div><span class="eyebrow">TIME TRACKING</span><h2>开始计时</h2></div><button class="close-button" type="button" data-modal-close>×</button></div>
+      <form action="{{ url_for('main.timer_start') }}" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="field"><span>正在做什么 <b>*</b></span><input name="title" required placeholder="例如：复测PHASE波形"></label>
+        <label class="field"><span>板卡型号（可选）</span><select name="pcb_id"><option value="">暂不关联</option>{% for item in quick_pcbs|default([]) %}<option value="{{ item.id }}" {{ 'selected' if pcb is defined and pcb.id == item.id }}>{{ item.model or '未填写型号' }} · PCB序列号：{{ item.serial }}</option>{% endfor %}</select></label>
+        <div class="modal-foot"><span>同一时间仅保留一个计时器</span><div><button class="secondary-button" type="button" data-modal-close>取消</button><button class="primary-button" type="submit">开始</button></div></div>
+      </form>
+    </section>
+  </div>
+  <div class="toast" id="toast"></div>
+  <dialog class="image-viewer" id="imageViewer" aria-label="图片预览"><div class="image-viewer-toolbar"><a id="imageViewerDownload" class="secondary-button" href="#">下载原图</a><form method="dialog"><button class="secondary-button" aria-label="关闭图片预览">关闭 ×</button></form></div><img id="imageViewerImage" alt="图片预览"></dialog>
+  <script src="{{ url_for('static', filename='backend.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

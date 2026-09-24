@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}板卡 · {{ system_name }}{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">WORK OBJECTS</p><h1>板卡</h1><p>以板卡型号为主要显示，PCB 序列号用于唯一识别。</p></div><button class="primary-button" data-modal-open="pcbModal">＋ 新建PCB</button></div>
+<form class="filter-bar" method="get"><input name="q" value="{{ q }}" placeholder="搜索板卡型号、PCB序列号或版本"><button class="secondary-button">搜索</button></form>
+<section class="panel table-panel">
+  <table class="data-table">
+    <thead><tr><th>板卡型号</th><th>PCB序列号 / 版本</th><th>状态</th><th>问题</th><th>最近更新</th><th></th></tr></thead>
+    <tbody>{% for pcb in pagination.items %}<tr><td><a class="strong-link" href="{{ url_for('main.pcb_detail',pcb_id=pcb.id) }}">{{ pcb.model or '未填写型号' }}</a></td><td>{{ pcb.serial }} <span class="muted">{{ pcb.revision or '' }}</span></td><td><span class="status-badge working">{{ pcb.status }}</span></td><td>{{ pcb.issues.filter_by(deleted_at=None).count() }}</td><td>{{ pcb.updated_at.strftime('%Y-%m-%d %H:%M') }}</td><td><a href="{{ url_for('main.pcb_detail',pcb_id=pcb.id) }}">查看 →</a></td></tr>{% else %}<tr><td colspan="6"><div class="empty-state">没有匹配的PCB。</div></td></tr>{% endfor %}</tbody>
+  </table>
+</section>
+{% include '_pagination.html' %}
+<div class="modal-backdrop" id="pcbModal"><section class="modal"><div class="modal-head"><div><span class="eyebrow">NEW PCB</span><h2>录入PCB</h2></div><button type="button" class="close-button" data-modal-close>×</button></div><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="field"><span>板卡型号</span><input name="model" autofocus></label><div class="field-grid"><label class="field"><span>PCB序列号 <b>*</b></span><input name="serial" required></label><label class="field"><span>PCB版本</span><input name="revision"></label></div><label class="field"><span>备注</span><textarea name="notes"></textarea></label><div class="modal-foot"><span>板卡型号主要展示；PCB序列号手动录入并检查重复</span><div><button type="button" class="secondary-button" data-modal-close>取消</button><button class="primary-button">创建</button></div></div></form></section></div>
+{% endblock %}

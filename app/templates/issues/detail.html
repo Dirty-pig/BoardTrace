@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% block title %}{{ issue.title }} · {{ system_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumb">
+  {% if issue.project %}<a href="{{ url_for('main.project_detail',project_id=issue.project.id) }}">{{ issue.project.name }}</a><span>›</span>{% endif %}
+  {% if issue.pcb %}<a href="{{ url_for('main.pcb_detail',pcb_id=issue.pcb.id) }}">{{ issue.pcb.model or issue.pcb.serial }}</a>{% elif not issue.project %}<a href="{{ url_for('main.issues') }}">全部问题</a>{% endif %}
+  <span>›</span><span>问题 #{{ issue.id }}</span>
+</div>
+<div class="object-header issue-header">
+  <div><div class="title-line"><span class="priority {{ 'high' if issue.priority=='高' }}">{{ issue.priority[:1] }}</span><h1>{{ issue.title }}</h1></div><p>创建于 {{ issue.created_at|cn_time }} · 最近更新 {{ issue.updated_at|cn_time('%m-%d %H:%M') }}</p></div>
+  <div class="object-actions"><button class="secondary-button" data-modal-open="editIssueModal">编辑标题与归属</button></div>
+</div>
+<div class="detail-layout issue-layout">
+  <section class="panel detail-main issue-stream">
+    {% if issue.current_summary or issue.description %}<div class="issue-summary"><h2>当前摘要</h2><div class="rich-content">{{ (issue.current_summary or issue.description)|e|replace('\n','<br>')|safe }}</div></div>{% endif %}
+    <div class="issue-stream-head">
+      <div><h2>过程记录</h2><p>按类型查看，或单独打开一条 Cell</p></div>
+      <span class="count-pill">{{ pagination.total }} 条</span>
+    </div>
+    <form class="composer backend-composer" action="{{ url_for('main.cell_create',issue_id=issue.id) }}" method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="composer-toolbar"><select name="kind" aria-label="Cell 类型">{% for kind in cell_kinds %}<option>{{ kind }}</option>{% endfor %}</select><button type="button" data-editor-wrap="**"><b>B</b></button><button type="button" class="color-dot red" data-editor-color="red" title="红色"></button><button type="button" class="color-dot orange" data-editor-color="orange" title="橙色"></button><button type="button" class="color-dot blue" data-editor-color="blue" title="蓝色"></button><button type="button" class="color-dot green" data-editor-color="green" title="绿色"></button><button type="button" data-editor-wrap="==">▰</button></div>
+      <p class="cell-kind-hint" id="cellKindHint" aria-live="polite">普通记录不改变问题状态。</p>
+      <label class="knowledge-title-field" id="knowledgeTitleField" hidden><span>知识小标题 <b>*</b></span><input name="title" id="knowledgeTitle" maxlength="200" placeholder="用一句话命名这条知识"></label>
+      <textarea name="content" id="cellEditor" placeholder="追加记录… 支持 Ctrl+V 粘贴图片，也可以拖入图片"></textarea>
+      <div class="upload-preview" id="uploadPreview"></div>
+      <div class="composer-foot"><div><label class="attach-button">▧ 图片/附件<input name="attachments" id="attachmentInput" type="file" multiple hidden></label><span>Markdown · 服务端安全过滤</span></div><button class="primary-button">发送 Cell</button></div>
+    </form>
+    <nav class="cell-filters" aria-label="筛选 Cell">
+      <a class="cell-filter {{ 'active' if not selected_kind and selected_cell is none }}" href="{{ url_for('main.issue_detail',issue_id=issue.id) }}">全部</a>
+      {% for kind in (cell_kinds|list) + ['状态变化'] if kinds_in_use.get(kind) %}
+        <a class="cell-filter {{ 'active' if selected_kind==kind and selected_cell is none }}" href="{{ url_for('main.issue_detail',issue_id=issue.id,kind=kind) }}">{{ kind }} <span>{{ kinds_in_use[kind] }}</span></a>
+      {% endfor %}
+    </nav>
+    {% if selected_cell is not none %}<div class="cell-focus-bar"><span>正在单独查看 Cell #{{ selected_cell }}</span><a href="{{ url_for('main.issue_detail',issue_id=issue.id) }}">返回全部记录 →</a></div>{% endif %}
+    <div class="chat-stream">
+      {% for cell in pagination.items %}
+      <article class="chat-cell" id="cell-{{ cell.id }}">
+        <div class="cell-avatar">{{ (cell.author.username if cell.author else 'R')[:1]|upper }}</div>
+        <div>
+          <div class="chat-meta"><strong>{{ cell.author.username if cell.author else 'ROOT' }}</strong><time>{{ cell.created_at|cn_time('%m-%d %H:%M') }}</time><span class="tag {{ 'orange' if cell.kind=='测试记录' else 'blue' }}">{{ cell.kind }}</span><a class="cell-focus-link" href="{{ url_for('main.issue_detail',issue_id=issue.id,cell=cell.id) }}" aria-label="单独查看 Cell {{ cell.id }}">单独查看</a>{% if cell.kind != '状态变化' %}<form class="cell-delete-form" action="{{ url_for('main.cell_trash',issue_id=issue.id,cell_id=cell.id) }}" method="post" data-confirm="{{ '将这条 Cell 移入回收站？独立知识条目会保留。' if cell.kind == '知识积累' else '将这条 Cell 移入回收站？可在回收站恢复。' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="cell-delete-button" aria-label="删除 Cell {{ cell.id }}">删除</button></form>{% endif %}</div>
+          <div class="chat-bubble">
+            {% if cell.kind == '知识积累' and cell.knowledge_entry %}<a class="knowledge-cell-link" href="/knowledge/{{ cell.knowledge_entry.id }}"><strong>{{ cell.knowledge_entry.title }}</strong><span>{{ cell.knowledge_entry.content_md[:180] }}{{ '…' if cell.knowledge_entry.content_md|length > 180 }}</span><small>打开知识条目 →</small></a>{% else %}<div class="rich-content">{{ cell.rendered_html|safe }}</div>{% endif %}
+            {% if cell.attachments.filter_by(deleted_at=None).count() %}
+            <div class="attachment-grid">
+              {% for attachment in cell.attachments.filter_by(deleted_at=None).all() %}
+                {% if attachment.mime_type.startswith('image/') %}<a href="{{ url_for('main.attachment_file',attachment_id=attachment.id,kind='download') }}" data-preview-url="{{ url_for('main.attachment_file',attachment_id=attachment.id,kind='view') }}"><img loading="lazy" src="{{ url_for('main.attachment_file',attachment_id=attachment.id,kind='thumb') }}" alt="{{ attachment.original_name }}"><span>{{ attachment.original_name }}</span></a>
+                {% else %}<a class="file-card" href="{{ url_for('main.attachment_file',attachment_id=attachment.id,kind='download') }}">▧ {{ attachment.original_name }}</a>{% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </article>
+      {% else %}<div class="empty-state">{{ '该类型暂无 Cell。' if selected_kind else '还没有 Cell，开始记录现场现象和测试过程。' }}</div>{% endfor %}
+    </div>
+    {% if pagination.pages > 1 %}
+    <nav class="pagination" aria-label="Cell翻页">
+      {% if pagination.has_prev %}<a href="{{ url_for('main.issue_detail',issue_id=issue.id,page=pagination.prev_num,kind=selected_kind) }}">← 较新记录</a>{% else %}<span></span>{% endif %}
+      <span>第 {{ pagination.page }} / {{ pagination.pages }} 页</span>
+      {% if pagination.has_next %}<a href="{{ url_for('main.issue_detail',issue_id=issue.id,page=pagination.next_num,kind=selected_kind) }}">较早记录 →</a>{% else %}<span></span>{% endif %}
+    </nav>
+    {% endif %}
+  </section>
+  <aside class="detail-side">
+    <section class="panel issue-control-panel">
+      <div class="panel-head"><h2>问题处理</h2></div>
+      <form class="issue-inline-form" action="{{ url_for('main.issue_state',issue_id=issue.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="field" value="status"><label for="issueStatus">状态</label><div><select id="issueStatus" name="value" data-auto-submit>{% for status in issue_statuses %}<option value="{{ status }}" {{ 'selected' if issue.status==status }}>{{ status }}</option>{% endfor %}</select><button class="secondary-button">保存</button></div></form>
+      <form class="issue-inline-form" action="{{ url_for('main.issue_state',issue_id=issue.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="field" value="priority"><label for="issuePriority">优先级</label><div><select id="issuePriority" name="value" data-auto-submit>{% for priority in priorities %}<option value="{{ priority }}" {{ 'selected' if issue.priority==priority }}>{{ priority }}</option>{% endfor %}</select><button class="secondary-button">保存</button></div></form>
+      <div class="issue-elapsed"><span>问题历时</span><strong id="issueElapsed" data-start-utc="{{ issue.created_at.isoformat() }}Z" data-end-utc="{{ issue.resolved_at.isoformat() ~ 'Z' if issue.status=='已解决' and issue.resolved_at else '' }}">{{ elapsed_label }}</strong><small>{{ '已在解决时停止' if issue.status=='已解决' else '从创建起自动计算' }} · 自然时间</small></div>
+    </section>
+    <section class="panel"><div class="panel-head"><h2>问题信息</h2></div><dl class="meta-list"><div><dt>主要归属</dt><dd>{{ (issue.pcb.model or issue.pcb.serial) if issue.pcb else (issue.project.name if issue.project else '待归类') }}</dd></div><div><dt>PCB序列号</dt><dd>{{ issue.pcb.serial if issue.pcb else '—' }}</dd></div><div><dt>创建时间</dt><dd>{{ issue.created_at|cn_time }}</dd></div>{% if issue.status=='已解决' and issue.resolved_at %}<div><dt>解决时间</dt><dd>{{ issue.resolved_at|cn_time }}</dd></div>{% endif %}<div><dt>标签</dt><dd><span class="chips">{% for tag in issue.tags.split(',') if tag.strip() %}<span>{{ tag.strip() }}</span>{% else %}<span>未标记</span>{% endfor %}</span></dd></div></dl></section>
+  </aside>
+</div>
+<div class="modal-backdrop" id="editIssueModal">
+  <section class="modal"><div class="modal-head"><h2>编辑问题</h2><button type="button" class="close-button" data-modal-close>×</button></div>
+    <form action="{{ url_for('main.issue_update',issue_id=issue.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="field"><span>标题</span><input name="title" value="{{ issue.title }}"></label><div class="field-grid"><label class="field"><span>板卡型号</span><select name="pcb_id"><option value="">待归类</option>{% for pcb in pcbs %}<option value="{{ pcb.id }}" {{ 'selected' if issue.pcb_id==pcb.id }}>{{ pcb.model or '未填写型号' }} · PCB序列号：{{ pcb.serial }}</option>{% endfor %}</select></label><label class="field"><span>项目</span><select name="project_id"><option value="">无</option>{% for project in projects %}<option value="{{ project.id }}" {{ 'selected' if issue.project_id==project.id }}>{{ project.name }}</option>{% endfor %}</select></label></div><label class="field"><span>当前摘要</span><textarea name="current_summary">{{ issue.current_summary }}</textarea></label><label class="field"><span>标签（逗号分隔）</span><input name="tags" value="{{ issue.tags }}"></label><div class="modal-foot"><span></span><button class="primary-button">保存</button></div></form>
+  </section>
+</div>
+{% endblock %}
