@@ -18,7 +18,7 @@
       {% for pcb in recent_pcbs %}
       <a class="pcb-row" href="{{ url_for('main.pcb_detail',pcb_id=pcb.id) }}">
         <span class="pcb-status {{ 'solved' if pcb.status in ['已完成','已解决'] else 'waiting' if pcb.status == '等待中' else 'working' }}"></span>
-        <span><strong>{{ pcb.model or '未填写型号' }}</strong><small>版本号：{{ pcb.revision or '未填写' }} · PCB 序列号：{{ pcb.serial }}</small></span>
+        <span><strong>{{ pcb.model or '未填写型号' }}</strong><small>{{ pcb.serial }} · {{ pcb.revision or '未填写版本' }}</small></span>
         <span><em>{{ pcb.status }}</em><small>{{ pcb.notes[:36] or '暂无说明' }}</small></span>
         <span><strong>{{ pcb.issues.filter_by(deleted_at=None).count() }}</strong><small>关联问题</small></span>
         <span><strong>{{ pcb.updated_at.strftime('%m-%d %H:%M') }}</strong><small>最近更新</small></span><b>›</b>
@@ -28,11 +28,11 @@
   </section>
   <section class="panel">
     <div class="panel-head"><div><h2>最近问题</h2><p>按更新时间</p></div><span class="count-pill">{{ recent_issues|length }}</span></div>
-    {% for issue in recent_issues[:5] %}<a class="side-issue {{ 'high' if issue.priority == '高' }}" href="{{ url_for('main.issue_detail',issue_id=issue.id) }}"><strong>{{ issue.title }}</strong><small>{% if issue.pcb %}{{ issue.pcb.model or '未填写型号' }} · 版本号：{{ issue.pcb.revision or '未填写' }} · PCB序列号：{{ issue.pcb.serial }}{% else %}待归类{% endif %} · {{ issue.status }}</small></a>{% else %}<div class="empty-state small">暂无问题。</div>{% endfor %}
+    {% for issue in recent_issues[:5] %}<a class="side-issue {{ 'high' if issue.priority == '高' }}" href="{{ url_for('main.issue_detail',issue_id=issue.id) }}"><strong>{{ issue.title }}</strong><small>{% if issue.pcb %}{{ issue.pcb.model or '未填写型号' }} · PCB序列号：{{ issue.pcb.serial }}{% else %}待归类{% endif %} · {{ issue.status }}</small></a>{% else %}<div class="empty-state small">暂无问题。</div>{% endfor %}
   </section>
   <section class="panel span-2">
     <div class="panel-head"><div><h2>最近工作</h2><p>工作记录与时间投入</p></div><a class="text-button" href="{{ url_for('main.work_logs') }}">查看全部 →</a></div>
-    <div class="activity-list">{% for log in recent_logs %}<article class="activity-row"><time>{{ log.created_at.strftime('%m-%d %H:%M') }}</time><span class="timeline-icon work">时</span><div><strong>{{ log.title }}</strong><p>{{ log.result or log.content or '待补充结果' }}</p><small>{% if log.pcb %}{{ log.pcb.model or '未填写型号' }} · 版本号：{{ log.pcb.revision or '未填写' }} · PCB序列号：{{ log.pcb.serial }}{% else %}未关联板卡{% endif %} · {{ log.minutes }}分钟</small></div></article>{% else %}<div class="empty-state">暂无工作记录。</div>{% endfor %}</div>
+    <div class="activity-list">{% for log in recent_logs %}<article class="activity-row"><time>{{ log.created_at.strftime('%m-%d %H:%M') }}</time><span class="timeline-icon work">时</span><div><strong>{{ log.title }}</strong><p>{{ log.result or log.content or '待补充结果' }}</p><small>{% if log.pcb %}{{ log.pcb.model or '未填写型号' }} · PCB序列号：{{ log.pcb.serial }}{% else %}未关联板卡{% endif %} · {{ log.minutes }}分钟</small></div></article>{% else %}<div class="empty-state">暂无工作记录。</div>{% endfor %}</div>
   </section>
   <section class="panel">
     <div class="panel-head"><div><h2>待归类</h2><p>稍后补充PCB或项目</p></div><span class="count-pill warning">{{ unfiled|length }}</span></div>

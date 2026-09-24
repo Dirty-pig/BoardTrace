@@ -28,7 +28,7 @@
     {% include '_pagination.html' %}
   </section>
   <aside class="detail-side">
-    <section class="panel"><div class="panel-head"><h2>关联板卡</h2><span class="count-pill">{{ project.pcbs|length }}</span></div>{% for pcb in project.pcbs %}<a class="side-issue" href="{{ url_for('main.pcb_detail',pcb_id=pcb.id) }}"><strong>{{ pcb.model or '未填写型号' }}</strong><small>版本号：{{ pcb.revision or '未填写' }} · PCB序列号：{{ pcb.serial }} · {{ pcb.status }}</small></a>{% else %}<div class="empty-state small">暂未关联板卡。</div>{% endfor %}</section>
+    <section class="panel"><div class="panel-head"><h2>关联板卡</h2><span class="count-pill">{{ project.pcbs|length }}</span></div>{% for pcb in project.pcbs %}<a class="side-issue" href="{{ url_for('main.pcb_detail',pcb_id=pcb.id) }}"><strong>{{ pcb.model or '未填写型号' }}</strong><small>PCB序列号：{{ pcb.serial }} · {{ pcb.status }}</small></a>{% else %}<div class="empty-state small">暂未关联板卡。</div>{% endfor %}</section>
     <section class="panel"><div class="panel-head"><h2>关联问题</h2><span class="count-pill">{{ project.issues.filter_by(deleted_at=None).count() }}</span></div>{% for issue in issues %}<a class="side-issue {{ 'high' if issue.priority=='高' }}" href="{{ url_for('main.issue_detail',issue_id=issue.id) }}"><strong>{{ issue.title }}</strong><small>{{ issue.priority }} · {{ issue.status }}</small></a>{% else %}<div class="empty-state small">暂无问题。</div>{% endfor %}</section>
   </aside>
 </div>
