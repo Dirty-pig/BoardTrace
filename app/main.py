@@ -3,9 +3,9 @@ from __future__ import annotations
 from datetime import date, datetime
 from pathlib import Path
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_file, send_from_directory, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_login import current_user, login_required
-from sqlalchemy import func
+from sqlalchemy import func, literal, select, union_all
 
 from .extensions import db
 from .issue_workflow import CELL_KINDS, ISSUE_STATUSES, PRIORITIES, apply_cell_status, duration_label, elapsed_seconds, set_issue_status
@@ -79,33 +79,85 @@ def pcbs():
             db.session.commit()
             flash("PCB已创建。", "success")
             return redirect(url_for("main.pcb_detail", pcb_id=pcb.id))
-    q = request.args.get("q", "").strip()
+    q = request.args.get("q", "").strip()[:128]
+    model = request.args.get("model", "").strip()[:128]
+    revision = request.args.get("revision", "").strip()[:64]
+    serial_filter = request.args.get("serial", "").strip()[:128]
     query = PCB.query.filter(PCB.deleted_at.is_(None))
     if q:
         like = f"%{q}%"
         query = query.filter(db.or_(PCB.serial.ilike(like), PCB.model.ilike(like), PCB.revision.ilike(like)))
+    if model:
+        query = query.filter(PCB.model == model)
+    if revision:
+        query = query.filter(PCB.revision == revision)
+    if serial_filter:
+        query = query.filter(PCB.serial == serial_filter)
     pagination = _pagination(query, PCB.updated_at.desc())
-    return render_template("pcbs/list.html", pagination=pagination, q=q)
+    return render_template("pcbs/list.html", pagination=pagination, q=q, model=model, revision=revision, serial_filter=serial_filter)
+
+
+@bp.get("/pcbs/options")
+@login_required
+def pcb_options():
+    """Return a bounded page of distinct values for the cascading PCB picker."""
+    field = request.args.get("field", "")
+    columns = {"model": PCB.model, "revision": PCB.revision, "serial": PCB.serial}
+    if field not in columns:
+        abort(400)
+    model = request.args.get("model", "").strip()[:128]
+    revision = request.args.get("revision", "").strip()[:64]
+    term = request.args.get("q", "").strip()[:128]
+    if field != "model" and not model:
+        return jsonify(options=[], has_more=False)
+    if field == "serial" and not revision:
+        return jsonify(options=[], has_more=False)
+    column = columns[field]
+    query = db.session.query(column).filter(PCB.deleted_at.is_(None), column != "")
+    if field != "model":
+        query = query.filter(PCB.model == model)
+    if field == "serial":
+        query = query.filter(PCB.revision == revision)
+    if term:
+        escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        query = query.filter(column.ilike(f"{escaped}%", escape="\\"))
+    rows = [value for (value,) in query.distinct().order_by(column).limit(31).all()]
+    return jsonify(options=rows[:30], has_more=len(rows) > 30)
 
 
 @bp.get("/pcbs/<int:pcb_id>")
 @login_required
 def pcb_detail(pcb_id):
     pcb = PCB.query.filter_by(id=pcb_id, deleted_at=None).first_or_404()
-    page = max(request.args.get("page", 1, type=int), 1)
+    page = min(max(request.args.get("page", 1, type=int), 1), 1_000_000)
     per_page = 20
-    issues = pcb.issues.filter(Issue.deleted_at.is_(None)).order_by(Issue.updated_at.desc()).all()
-    logs = pcb.work_logs.filter(WorkLog.deleted_at.is_(None)).order_by(WorkLog.created_at.desc()).all()
-    object_cells = pcb.object_cells.filter(ObjectCell.deleted_at.is_(None)).order_by(ObjectCell.created_at.desc()).all()
-    timeline = ([{"type": "issue", "at": x.created_at, "item": x} for x in issues]
-                + [{"type": "work", "at": x.created_at, "item": x} for x in logs]
-                + [{"type": "cell", "at": x.created_at, "item": x} for x in object_cells])
-    timeline.sort(key=lambda x: x["at"], reverse=True)
-    total = len(timeline)
-    timeline = timeline[(page - 1) * per_page: page * per_page]
-    total_minutes = sum(x.minutes for x in logs)
+    events = union_all(
+        select(literal("issue").label("type"), Issue.id.label("item_id"), Issue.created_at.label("at"))
+        .where(Issue.pcb_id == pcb.id, Issue.deleted_at.is_(None)),
+        select(literal("work"), WorkLog.id, WorkLog.created_at)
+        .where(WorkLog.pcb_id == pcb.id, WorkLog.deleted_at.is_(None)),
+        select(literal("cell"), ObjectCell.id, ObjectCell.created_at)
+        .where(ObjectCell.pcb_id == pcb.id, ObjectCell.deleted_at.is_(None)),
+    ).subquery()
+    event_rows = db.session.execute(
+        select(events.c.type, events.c.item_id, events.c.at)
+        .order_by(events.c.at.desc(), events.c.type, events.c.item_id.desc())
+        .offset((page - 1) * per_page).limit(per_page + 1)
+    ).all()
+    has_more = len(event_rows) > per_page
+    event_rows = event_rows[:per_page]
+    entity_types = {"issue": Issue, "work": WorkLog, "cell": ObjectCell}
+    entities = {}
+    for kind, entity_type in entity_types.items():
+        ids = [row.item_id for row in event_rows if row.type == kind]
+        if ids:
+            entities[kind] = {item.id: item for item in db.session.query(entity_type).filter(entity_type.id.in_(ids)).all()}
+    timeline = [{"type": row.type, "at": row.at, "item": entities[row.type][row.item_id]} for row in event_rows]
+    issues = pcb.issues.filter(Issue.deleted_at.is_(None), Issue.status != "已解决").order_by(Issue.updated_at.desc()).limit(20).all()
+    unresolved_count = pcb.issues.filter(Issue.deleted_at.is_(None), Issue.status != "已解决").count()
+    total_minutes = db.session.query(func.coalesce(func.sum(WorkLog.minutes), 0)).filter(WorkLog.pcb_id == pcb.id, WorkLog.deleted_at.is_(None)).scalar()
     attachments_count = Attachment.query.filter_by(pcb_id=pcb.id, deleted_at=None).count()
-    return render_template("pcbs/detail.html", pcb=pcb, issues=issues, timeline=timeline, page=page, has_more=page * per_page < total, total_minutes=total_minutes, attachments_count=attachments_count)
+    return render_template("pcbs/detail.html", pcb=pcb, issues=issues, unresolved_count=unresolved_count, timeline=timeline, page=page, has_more=has_more, total_minutes=total_minutes, attachments_count=attachments_count)
 
 
 def _create_object_cell(*, pcb=None, project=None):
@@ -514,7 +566,7 @@ def search():
     results = []
     if q:
         like = f"%{q}%"
-        results.extend({"type": "板卡", "title": row.model or "未填写型号", "snippet": f"PCB序列号：{row.serial} {row.revision}", "url": url_for("main.pcb_detail", pcb_id=row.id)} for row in PCB.query.filter(PCB.deleted_at.is_(None), db.or_(PCB.serial.ilike(like), PCB.model.ilike(like))).limit(20))
+        results.extend({"type": "板卡", "title": row.model or "未填写型号", "snippet": f"版本号：{row.revision or '未填写'} · PCB序列号：{row.serial}", "url": url_for("main.pcb_detail", pcb_id=row.id)} for row in PCB.query.filter(PCB.deleted_at.is_(None), db.or_(PCB.serial.ilike(like), PCB.model.ilike(like))).limit(20))
         results.extend({"type": "项目", "title": row.name, "snippet": row.objective[:200], "url": url_for("main.project_detail", project_id=row.id)} for row in Project.query.filter(Project.deleted_at.is_(None), db.or_(Project.name.ilike(like), Project.objective.ilike(like))).limit(20))
         results.extend({"type": "问题", "title": row.title, "snippet": (row.description or row.current_summary)[:200], "url": url_for("main.issue_detail", issue_id=row.id)} for row in Issue.query.filter(Issue.deleted_at.is_(None), db.or_(Issue.title.ilike(like), Issue.description.ilike(like), Issue.tags.ilike(like))).limit(20))
         results.extend({"type": "知识", "title": row.title, "snippet": row.content_md[:200], "url": url_for("knowledge.detail", entry_id=row.id)} for row in KnowledgeEntry.query.filter(KnowledgeEntry.deleted_at.is_(None), db.or_(KnowledgeEntry.title.ilike(like), KnowledgeEntry.content_md.ilike(like))).limit(20))
