@@ -3,6 +3,43 @@
 {% block content %}
 <div class="breadcrumb"><a href="/knowledge">知识库</a><span>›</span><span>知识 #{{ entry.id }}</span></div>
 <div class="object-header"><div><p class="eyebrow">KNOWLEDGE NOTE</p><h1>{{ entry.title }}</h1><p>创建于 {{ entry.created_at|cn_time }} · 最近更新 {{ entry.updated_at|cn_time }}</p></div><button class="secondary-button" data-modal-open="editKnowledgeModal">编辑知识</button></div>
-<div class="detail-layout knowledge-layout"><section class="panel detail-main knowledge-detail-body"><div class="rich-content">{{ entry.rendered_html|safe }}</div>{% if entry.source_cell and entry.source_cell.attachments.filter_by(deleted_at=None).count() %}<div class="attachment-grid">{% for attachment in entry.source_cell.attachments.filter_by(deleted_at=None).all() %}{% if attachment.mime_type.startswith('image/') %}<a href="{{ url_for('main.attachment_file',attachment_id=attachment.id,kind='download') }}" data-preview-url="{{ url_for('main.attachment_file',attachment_id=attachment.id,kind='view') }}"><img loading="lazy" src="{{ url_for('main.attachment_file',attachment_id=attachment.id,kind='thumb') }}" alt="{{ attachment.original_name }}"><span>{{ attachment.original_name }}</span></a>{% else %}<a class="file-card" href="{{ url_for('main.attachment_file',attachment_id=attachment.id,kind='download') }}">▧ {{ attachment.original_name }}</a>{% endif %}{% endfor %}</div>{% endif %}</section><aside class="detail-side"><section class="panel"><div class="panel-head"><h2>来源</h2></div>{% if entry.source_issue and not entry.source_issue.deleted_at %}<a class="strong-link" href="{{ url_for('main.issue_detail',issue_id=entry.source_issue_id) }}">{{ entry.source_issue.title }}</a><p class="knowledge-source-note">从问题 Cell 沉淀；这里的正文独立保存，便于集中检索和复用。</p>{% else %}<p class="knowledge-source-note">独立知识记录</p>{% endif %}</section></aside></div>
-<div class="modal-backdrop" id="editKnowledgeModal" aria-hidden="true"><section class="modal"><div class="modal-head"><h2>编辑知识</h2><button type="button" class="close-button" data-modal-close>×</button></div><form action="/knowledge/{{ entry.id }}/update" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="field"><span>小标题 <b>*</b></span><input name="title" maxlength="200" value="{{ entry.title }}" required></label><label class="field"><span>正文 <b>*</b></span><textarea name="content" maxlength="50000" required>{{ entry.content_md }}</textarea></label><div class="modal-foot"><span></span><button class="primary-button">保存修改</button></div></form></section></div>
+<div class="detail-layout knowledge-layout">
+  <section class="panel detail-main knowledge-detail-body">
+    <div class="rich-content">{{ entry.rendered_html|safe }}</div>
+    {% if entry.source_cell and entry.source_cell.attachments.filter_by(deleted_at=None).count() %}
+    <div class="attachment-grid">{% for attachment in entry.source_cell.attachments.filter_by(deleted_at=None).all() %}{% if attachment.mime_type.startswith('image/') %}<a href="{{ url_for('main.attachment_file',attachment_id=attachment.id,kind='download') }}" data-preview-url="{{ url_for('main.attachment_file',attachment_id=attachment.id,kind='view') }}"><img loading="lazy" src="{{ url_for('main.attachment_file',attachment_id=attachment.id,kind='thumb') }}" alt="{{ attachment.original_name }}"><span>{{ attachment.original_name }}</span></a>{% else %}<a class="file-card" href="{{ url_for('main.attachment_file',attachment_id=attachment.id,kind='download') }}">▧ {{ attachment.original_name }}</a>{% endif %}{% endfor %}</div>
+    {% endif %}
+    {% if issue %}
+    <section class="knowledge-practice">
+      <div class="panel-head"><div><h2>相关实践记录</h2><p>来自关联问题的最近 8 条现象、测试与判断</p></div><a class="text-button" href="{{ url_for('main.issue_detail',issue_id=issue.id) }}">查看完整问题过程 →</a></div>
+      {% for cell in practice_cells %}
+      <a class="knowledge-practice-row" href="{{ url_for('main.issue_detail',issue_id=issue.id,cell=cell.id) }}"><span class="tag blue">{{ cell.kind }}</span><span>{{ cell.content_md[:180] }}{{ '…' if cell.content_md|length > 180 }}</span><time>{{ cell.created_at|cn_time('%m-%d %H:%M') }}</time></a>
+      {% else %}<p class="knowledge-source-note">这个问题还没有实践记录。可以进入问题页补充测试条件、结果和判断。</p>{% endfor %}
+    </section>
+    {% endif %}
+  </section>
+  <aside class="detail-side">
+    <section class="panel"><div class="panel-head"><h2>{{ '关联问题与实践' if issue else '关联问题' }}</h2></div>
+      {% if issue %}
+      <a class="strong-link" href="{{ url_for('main.issue_detail',issue_id=issue.id) }}">{{ issue.title }}</a>
+      <p class="knowledge-source-note">{{ '由问题 Cell 沉淀' if entry.source_cell_id else '在知识库关联' }} · 状态：{{ issue.status }}</p>
+      {% if entry.source_cell and not entry.source_cell.deleted_at %}<a class="text-button" href="{{ url_for('main.issue_detail',issue_id=issue.id,cell=entry.source_cell.id) }}">查看来源 Cell →</a>{% endif %}
+      {% if issue.pcb %}<p class="knowledge-source-note">板卡：{{ issue.pcb.model or '未填写型号' }} · {{ issue.pcb.revision or '未填写版本' }} · {{ issue.pcb.serial }}</p>{% endif %}
+      {% if issue.current_summary or issue.description %}<p class="knowledge-source-note">问题背景：{{ (issue.current_summary or issue.description)[:300] }}</p>{% endif %}
+      {% else %}<p class="knowledge-source-note">{{ '原问题已移入回收站' if entry.source_issue_id else '独立知识记录，可通过编辑关联已有问题' }}</p>{% endif %}
+    </section>
+  </aside>
+</div>
+<div class="modal-backdrop" id="editKnowledgeModal" aria-hidden="true"><section class="modal"><div class="modal-head"><h2>编辑知识</h2><button type="button" class="close-button" data-modal-close>×</button></div>
+  <form action="{{ url_for('knowledge.update',entry_id=entry.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="field"><span>小标题 <b>*</b></span><input name="title" maxlength="200" value="{{ entry.title }}" required></label>
+    <label class="field"><span>正文 <b>*</b></span><textarea name="content" maxlength="50000" required>{{ entry.content_md }}</textarea></label>
+    {% if entry.source_cell_id %}
+    <div class="field"><span>关联问题</span><p class="knowledge-source-note">此知识来自问题 Cell，原始问题关联不可修改。</p></div>
+    {% else %}
+    <label class="field"><span>关联问题（可选）</span><input name="issue_ref" list="editKnowledgeIssueOptions" data-knowledge-issue-picker autocomplete="off" value="{{ ('#' ~ issue.id ~ ' · ' ~ issue.title) if issue else '' }}" placeholder="输入问题标题，从下拉候选中选择"><datalist id="editKnowledgeIssueOptions"></datalist><small>留空则作为独立知识保存。</small></label>
+    {% endif %}
+    <div class="modal-foot"><span></span><button class="primary-button">保存修改</button></div>
+  </form>
+</section></div>
 {% endblock %}
