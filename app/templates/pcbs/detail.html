@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
 {% block title %}{{ pcb.model or pcb.serial }} · {{ system_name }}{% endblock %}
 {% block content %}
-<div class="breadcrumb"><a href="{{ url_for('main.pcbs') }}">板卡</a><span>›</span><span>{{ pcb.model or '未填写型号' }}</span><span>·</span><span>{{ pcb.serial }}</span></div>
+<div class="breadcrumb"><a href="{{ url_for('main.pcbs') }}">板卡</a><span>›</span><span>{{ pcb|pcb_label }}</span></div>
 <div class="object-header">
-  <div class="object-title"><span class="object-icon">PCB</span><div><div class="title-line"><h1>{{ pcb.model or '未填写型号' }}</h1><span class="status-badge working">{{ pcb.status }}</span></div><p>{{ pcb.serial }} · {{ pcb.revision or '未填写版本' }} · 手动录入</p></div></div>
+  <div class="object-title"><span class="object-icon">PCB</span><div><div class="title-line"><h1>{{ pcb.model or '未填写型号' }}</h1><span class="status-badge working">{{ pcb.status }}</span></div><p>{{ pcb|pcb_label(false) }} · 手动录入</p></div></div>
   <div class="object-actions"><button class="secondary-button" data-modal-open="editPcbModal">编辑信息</button><button class="primary-button" data-modal-open="quickModal">＋ 添加问题</button></div>
 </div>
 <div class="object-stats"><div><span>累计投入</span><strong>{{ total_minutes // 60 }}h {{ total_minutes % 60 }}m</strong></div><div><span>未解决问题</span><strong>{{ unresolved_count }}</strong></div><div><span>相关图片</span><strong>{{ attachments_count }}</strong></div><div><span>最近更新</span><strong>{{ pcb.updated_at.strftime('%m-%d %H:%M') }}</strong></div></div>

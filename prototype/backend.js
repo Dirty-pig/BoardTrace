@@ -71,7 +71,7 @@
       lookupController = new AbortController();
       try {
         const rows = await fetch(`/api/v1/pcbs?q=${encodeURIComponent(q)}&limit=10`, {signal: lookupController.signal}).then(r => r.json());
-        menu.innerHTML = rows.length ? rows.map(row => `<a class="lookup-result" href="/pcbs/${row.id}"><span><strong>${escapeHtml(row.model || '未填写型号')}</strong><small>${escapeHtml(row.serial)} · ${escapeHtml(row.revision || '未填写版本')}</small></span><small>${escapeHtml(row.status)}</small></a>`).join('') : '<div class="lookup-result"><small>没有匹配的PCB</small></div>';
+        menu.innerHTML = rows.length ? rows.map(row => `<a class="lookup-result" href="/pcbs/${row.id}"><span><strong>${escapeHtml(row.model || '未填写型号')}</strong><small>${escapeHtml([row.revision, row.serial].map(value => value?.trim() || '\u00a0\u00a0\u00a0').join(' - '))}</small></span><small>${escapeHtml(row.status)}</small></a>`).join('') : '<div class="lookup-result"><small>没有匹配的PCB</small></div>';
         menu.classList.add('show');
       } catch (error) { if (error.name !== 'AbortError') menu.classList.remove('show'); }
     });

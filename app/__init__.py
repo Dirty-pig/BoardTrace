@@ -39,6 +39,10 @@ def create_app(test_config=None):
     app.register_blueprint(api_bp, url_prefix="/api/v1")
     app.register_blueprint(knowledge_bp)
 
+    from .display import pcb_label
+
+    app.add_template_filter(pcb_label)
+
     @app.template_filter("cn_time")
     def cn_time(value, fmt="%Y-%m-%d %H:%M"):
         if value is None:

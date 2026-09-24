@@ -5,8 +5,8 @@
 <form class="filter-bar" method="get"><input name="q" value="{{ q }}" placeholder="仅按 PCB 序列号搜索" aria-label="PCB 序列号"><button class="secondary-button">搜索</button></form>
 <section class="panel table-panel">
   <table class="data-table">
-    <thead><tr><th>板卡型号</th><th>PCB序列号 / 版本</th><th>状态</th><th>问题</th><th>最近更新</th><th></th></tr></thead>
-    <tbody>{% for pcb in pagination.items %}<tr><td><a class="strong-link" href="{{ url_for('main.pcb_detail',pcb_id=pcb.id) }}">{{ pcb.model or '未填写型号' }}</a></td><td>{{ pcb.serial }} <span class="muted">{{ pcb.revision or '' }}</span></td><td><span class="status-badge working">{{ pcb.status }}</span></td><td>{{ pcb.issues.filter_by(deleted_at=None).count() }}</td><td>{{ pcb.updated_at.strftime('%Y-%m-%d %H:%M') }}</td><td><a href="{{ url_for('main.pcb_detail',pcb_id=pcb.id) }}">查看 →</a></td></tr>{% else %}<tr><td colspan="6"><div class="empty-state">没有匹配的PCB。</div></td></tr>{% endfor %}</tbody>
+    <thead><tr><th>板卡型号</th><th>版本 - 序列号</th><th>状态</th><th>问题</th><th>最近更新</th><th></th></tr></thead>
+    <tbody>{% for pcb in pagination.items %}<tr><td><a class="strong-link" href="{{ url_for('main.pcb_detail',pcb_id=pcb.id) }}">{{ pcb.model or '未填写型号' }}</a></td><td>{{ pcb|pcb_label(false) }}</td><td><span class="status-badge working">{{ pcb.status }}</span></td><td>{{ pcb.issues.filter_by(deleted_at=None).count() }}</td><td>{{ pcb.updated_at.strftime('%Y-%m-%d %H:%M') }}</td><td><a href="{{ url_for('main.pcb_detail',pcb_id=pcb.id) }}">查看 →</a></td></tr>{% else %}<tr><td colspan="6"><div class="empty-state">没有匹配的PCB。</div></td></tr>{% endfor %}</tbody>
   </table>
 </section>
 {% include '_pagination.html' %}
