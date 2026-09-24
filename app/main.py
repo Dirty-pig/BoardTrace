@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from pathlib import Path
 
-from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, send_file, send_from_directory, url_for
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import func, literal, select, union_all
 
@@ -80,49 +80,12 @@ def pcbs():
             flash("PCB已创建。", "success")
             return redirect(url_for("main.pcb_detail", pcb_id=pcb.id))
     q = request.args.get("q", "").strip()[:128]
-    model = request.args.get("model", "").strip()[:128]
-    revision = request.args.get("revision", "").strip()[:64]
-    serial_filter = request.args.get("serial", "").strip()[:128]
     query = PCB.query.filter(PCB.deleted_at.is_(None))
     if q:
         like = f"%{q}%"
-        query = query.filter(db.or_(PCB.serial.ilike(like), PCB.model.ilike(like), PCB.revision.ilike(like)))
-    if model:
-        query = query.filter(PCB.model == model)
-    if revision:
-        query = query.filter(PCB.revision == revision)
-    if serial_filter:
-        query = query.filter(PCB.serial == serial_filter)
+        query = query.filter(PCB.serial.ilike(like))
     pagination = _pagination(query, PCB.updated_at.desc())
-    return render_template("pcbs/list.html", pagination=pagination, q=q, model=model, revision=revision, serial_filter=serial_filter)
-
-
-@bp.get("/pcbs/options")
-@login_required
-def pcb_options():
-    """Return a bounded page of distinct values for the cascading PCB picker."""
-    field = request.args.get("field", "")
-    columns = {"model": PCB.model, "revision": PCB.revision, "serial": PCB.serial}
-    if field not in columns:
-        abort(400)
-    model = request.args.get("model", "").strip()[:128]
-    revision = request.args.get("revision", "").strip()[:64]
-    term = request.args.get("q", "").strip()[:128]
-    if field != "model" and not model:
-        return jsonify(options=[], has_more=False)
-    if field == "serial" and not revision:
-        return jsonify(options=[], has_more=False)
-    column = columns[field]
-    query = db.session.query(column).filter(PCB.deleted_at.is_(None), column != "")
-    if field != "model":
-        query = query.filter(PCB.model == model)
-    if field == "serial":
-        query = query.filter(PCB.revision == revision)
-    if term:
-        escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        query = query.filter(column.ilike(f"{escaped}%", escape="\\"))
-    rows = [value for (value,) in query.distinct().order_by(column).limit(31).all()]
-    return jsonify(options=rows[:30], has_more=len(rows) > 30)
+    return render_template("pcbs/list.html", pagination=pagination, q=q)
 
 
 @bp.get("/pcbs/<int:pcb_id>")
@@ -570,7 +533,7 @@ def search():
     results = []
     if q:
         like = f"%{q}%"
-        results.extend({"type": "板卡", "title": row.model or "未填写型号", "snippet": f"版本号：{row.revision or '未填写'} · PCB序列号：{row.serial}", "url": url_for("main.pcb_detail", pcb_id=row.id)} for row in PCB.query.filter(PCB.deleted_at.is_(None), db.or_(PCB.serial.ilike(like), PCB.model.ilike(like))).limit(20))
+        results.extend({"type": "板卡", "title": row.model or "未填写型号", "snippet": f"PCB序列号：{row.serial} {row.revision}", "url": url_for("main.pcb_detail", pcb_id=row.id)} for row in PCB.query.filter(PCB.deleted_at.is_(None), db.or_(PCB.serial.ilike(like), PCB.model.ilike(like))).limit(20))
         results.extend({"type": "项目", "title": row.name, "snippet": row.objective[:200], "url": url_for("main.project_detail", project_id=row.id)} for row in Project.query.filter(Project.deleted_at.is_(None), db.or_(Project.name.ilike(like), Project.objective.ilike(like))).limit(20))
         results.extend({"type": "问题", "title": row.title, "snippet": (row.description or row.current_summary)[:200], "url": url_for("main.issue_detail", issue_id=row.id)} for row in Issue.query.filter(Issue.deleted_at.is_(None), db.or_(Issue.title.ilike(like), Issue.description.ilike(like), Issue.tags.ilike(like))).limit(20))
         results.extend({"type": "知识", "title": row.title, "snippet": row.content_md[:200], "url": url_for("knowledge.detail", entry_id=row.id)} for row in KnowledgeEntry.query.filter(KnowledgeEntry.deleted_at.is_(None), db.or_(KnowledgeEntry.title.ilike(like), KnowledgeEntry.content_md.ilike(like))).limit(20))

@@ -9,13 +9,6 @@
 .filter-bar { display: flex; gap: 8px; margin-bottom: 14px; }
 .filter-bar input, .filter-bar select { min-width: 180px; height: 38px; border: 1px solid var(--line); border-radius: 8px; background: white; padding: 0 10px; }
 .filter-bar input { flex: 1; }
-.pcb-hierarchy-filter { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(140px, 1fr) auto; align-items: end; }
-.pcb-hierarchy-filter .field { padding: 0; min-width: 0; }
-.pcb-hierarchy-filter .field input { min-width: 0; width: 100%; box-sizing: border-box; }
-.pcb-hierarchy-filter button { height: 38px; }
-.pcb-filter-hint { margin: -3px 0 13px; color: var(--muted); font-size: 11px; }
-@media (max-width: 1000px) { .pcb-hierarchy-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 600px) { .pcb-hierarchy-filter { grid-template-columns: 1fr; } }
 .table-panel { padding: 0; overflow: hidden; }
 .data-table { width: 100%; border-collapse: collapse; text-align: left; }
 .data-table th { background: #f8fafc; color: var(--muted); font-size: 11px; font-weight: 600; }

@@ -71,7 +71,7 @@
       lookupController = new AbortController();
       try {
         const rows = await fetch(`/api/v1/pcbs?q=${encodeURIComponent(q)}&limit=10`, {signal: lookupController.signal}).then(r => r.json());
-        menu.innerHTML = rows.length ? rows.map(row => `<a class="lookup-result" href="/pcbs/${row.id}"><span><strong>${escapeHtml(row.model || '未填写型号')}</strong><small>${escapeHtml(row.revision || '未填写版本')} · ${escapeHtml(row.serial)}</small></span><small>${escapeHtml(row.status)}</small></a>`).join('') : '<div class="lookup-result"><small>没有匹配的PCB</small></div>';
+        menu.innerHTML = rows.length ? rows.map(row => `<a class="lookup-result" href="/pcbs/${row.id}"><span><strong>${escapeHtml(row.model || '未填写型号')}</strong><small>${escapeHtml(row.serial)} · ${escapeHtml(row.revision || '未填写版本')}</small></span><small>${escapeHtml(row.status)}</small></a>`).join('') : '<div class="lookup-result"><small>没有匹配的PCB</small></div>';
         menu.classList.add('show');
       } catch (error) { if (error.name !== 'AbortError') menu.classList.remove('show'); }
     });
@@ -79,57 +79,6 @@
   }
 
   function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char])); }
-
-  // Keep PCB pickers small: request at most 30 matching values when a field is used.
-  $$('form[data-pcb-cascade]').forEach(form => {
-    const fields = Object.fromEntries($$('[data-pcb-option]', form).map(input => [input.dataset.pcbOption, input]));
-    const timers = new Map();
-    const controllers = new Map();
-    function clearField(name, clearValue = false) {
-      const input = fields[name];
-      if (!input) return;
-      clearTimeout(timers.get(name));
-      controllers.get(name)?.abort();
-      input.list?.replaceChildren();
-      if (clearValue) input.value = '';
-    }
-    async function loadOptions(name) {
-      const input = fields[name];
-      const model = fields.model?.value.trim() || '';
-      const revision = fields.revision?.value.trim() || '';
-      if (!input || (name !== 'model' && !model) || (name === 'serial' && !revision)) {
-        clearField(name);
-        return;
-      }
-      controllers.get(name)?.abort();
-      const controller = new AbortController();
-      controllers.set(name, controller);
-      const params = new URLSearchParams({field: name, q: input.value.trim()});
-      if (name !== 'model') params.set('model', model);
-      if (name === 'serial') params.set('revision', revision);
-      try {
-        const response = await fetch(`/pcbs/options?${params}`, {signal: controller.signal});
-        if (!response.ok) return;
-        const {options} = await response.json();
-        if (controller.signal.aborted) return;
-        input.list?.replaceChildren(...options.map(value => {
-          const option = document.createElement('option');
-          option.value = value;
-          return option;
-        }));
-      } catch (error) { if (error.name !== 'AbortError') input.list?.replaceChildren(); }
-    }
-    Object.entries(fields).forEach(([name, input]) => {
-      input.addEventListener('focus', () => loadOptions(name));
-      input.addEventListener('input', () => {
-        if (name === 'model') { clearField('revision', true); clearField('serial', true); }
-        if (name === 'revision') clearField('serial', true);
-        clearTimeout(timers.get(name));
-        controllers.get(name)?.abort();
-        timers.set(name, setTimeout(() => loadOptions(name), 180));
-      });
-    });
-  });
 
   $$('[data-knowledge-issue-picker]').forEach(input => {
     let timer;
