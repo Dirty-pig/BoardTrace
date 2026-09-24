@@ -83,3 +83,86 @@ def test_deleting_source_cell_keeps_independent_knowledge(app, initialized_clien
     with app.app_context():
         assert Cell.query.get(cell_id).deleted_at is not None
         assert KnowledgeEntry.query.get(entry_id).deleted_at is None
+
+
+def test_knowledge_can_link_to_issue_and_show_practice(app, initialized_client):
+    from app.models import KnowledgeEntry
+
+    created = initialized_client.post("/issues", data={"title": "电源纹波异常", "description": "上电后测得纹波偏高"})
+    issue_id = int(created.headers["Location"].rstrip("/").split("/")[-1])
+    initialized_client.post(
+        f"/issues/{issue_id}/cells", data={"kind": "测试记录", "content": "更换探头接地方式后复测"}
+    )
+    response = initialized_client.post(
+        "/knowledge",
+        data={"title": "降低测量伪影", "content": "使用短地弹簧。", "issue_ref": f"#{issue_id} · 电源纹波异常"},
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        entry = KnowledgeEntry.query.filter_by(title="降低测量伪影").one()
+        entry_id = entry.id
+        assert entry.source_issue_id == issue_id
+        assert entry.source_cell_id is None
+
+    detail = initialized_client.get(f"/knowledge/{entry_id}").get_data(as_text=True)
+    assert "电源纹波异常" in detail
+    assert "上电后测得纹波偏高" in detail
+    assert "更换探头接地方式后复测" in detail
+    assert f"/issues/{issue_id}?cell=" in detail
+    issue_page = initialized_client.get(f"/issues/{issue_id}").get_data(as_text=True)
+    assert "相关知识" in issue_page and "降低测量伪影" in issue_page
+    filtered = initialized_client.get(f"/knowledge?issue_id={issue_id}").get_data(as_text=True)
+    assert "降低测量伪影" in filtered
+
+    response = initialized_client.post(
+        f"/knowledge/{entry_id}/update",
+        data={"title": "降低测量伪影", "content": "使用短地弹簧。", "issue_ref": ""},
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        assert KnowledgeEntry.query.get(entry_id).source_issue_id is None
+    assert "降低测量伪影" not in initialized_client.get(f"/issues/{issue_id}").get_data(as_text=True)
+    assert "独立知识记录" in initialized_client.get(f"/knowledge/{entry_id}").get_data(as_text=True)
+    initialized_client.post(
+        f"/knowledge/{entry_id}/update",
+        data={"title": "降低测量伪影", "content": "使用短地弹簧。", "issue_ref": f"#{issue_id} · 电源纹波异常"},
+    )
+    with app.app_context():
+        assert KnowledgeEntry.query.get(entry_id).source_issue_id == issue_id
+
+
+def test_knowledge_issue_picker_is_bounded_and_validated(app, initialized_client):
+    from app.models import KnowledgeEntry
+
+    for number in range(25):
+        initialized_client.post("/issues", data={"title": f"实践问题 {number:02}"})
+    options = initialized_client.get("/knowledge/issue-options?q=实践问题").get_json()["options"]
+    assert len(options) == 20
+    assert all(option.startswith("#") for option in options)
+    assert initialized_client.get("/knowledge/issue-options?q=%23" + "9" * 40).get_json()["options"] == []
+    response = initialized_client.post(
+        "/knowledge", data={"title": "无效关联", "content": "正文", "issue_ref": "随便输入的问题"}
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        assert KnowledgeEntry.query.filter_by(title="无效关联").count() == 0
+
+
+def test_knowledge_from_issue_cell_keeps_its_original_issue(app, initialized_client):
+    from app.models import KnowledgeEntry
+
+    first = initialized_client.post("/issues", data={"title": "原始问题"})
+    second = initialized_client.post("/issues", data={"title": "其他问题"})
+    first_id = int(first.headers["Location"].rstrip("/").split("/")[-1])
+    second_id = int(second.headers["Location"].rstrip("/").split("/")[-1])
+    initialized_client.post(
+        f"/issues/{first_id}/cells", data={"kind": "知识积累", "title": "来源固定", "content": "实践总结"}
+    )
+    with app.app_context():
+        entry_id = KnowledgeEntry.query.filter_by(title="来源固定").one().id
+    initialized_client.post(
+        f"/knowledge/{entry_id}/update",
+        data={"title": "来源固定", "content": "实践总结", "issue_ref": f"#{second_id} · 其他问题"},
+    )
+    with app.app_context():
+        assert KnowledgeEntry.query.get(entry_id).source_issue_id == first_id

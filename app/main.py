@@ -383,11 +383,15 @@ def issue_detail(issue_id):
         issue.cells.filter(Cell.deleted_at.is_(None))
         .with_entities(Cell.kind, func.count(Cell.id)).group_by(Cell.kind).all()
     )
+    related_query = KnowledgeEntry.query.filter_by(source_issue_id=issue.id, deleted_at=None)
+    related_knowledge_count = related_query.count()
+    related_knowledge = related_query.order_by(KnowledgeEntry.updated_at.desc()).limit(8).all()
     seconds = elapsed_seconds(issue)
     return render_template(
         "issues/detail.html", issue=issue, pagination=pagination, selected_kind=selected_kind,
         selected_cell=selected_cell, kinds_in_use=kinds_in_use, elapsed_label=duration_label(seconds),
         elapsed_seconds=seconds,
+        related_knowledge=related_knowledge, related_knowledge_count=related_knowledge_count,
         pcbs=PCB.query.filter_by(deleted_at=None).order_by(PCB.updated_at.desc()).limit(100).all(),
         projects=Project.query.filter_by(deleted_at=None).order_by(Project.updated_at.desc()).limit(100).all(),
     )

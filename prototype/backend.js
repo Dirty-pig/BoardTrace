@@ -131,6 +131,33 @@
     });
   });
 
+  $$('[data-knowledge-issue-picker]').forEach(input => {
+    let timer;
+    let controller;
+    async function loadIssues() {
+      controller?.abort();
+      controller = new AbortController();
+      try {
+        const q = encodeURIComponent(input.value.trim());
+        const response = await fetch(`/knowledge/issue-options?q=${q}`, {signal: controller.signal});
+        if (!response.ok) return;
+        const {options} = await response.json();
+        if (controller.signal.aborted) return;
+        input.list?.replaceChildren(...options.map(value => {
+          const option = document.createElement('option');
+          option.value = value;
+          return option;
+        }));
+      } catch (error) { if (error.name !== 'AbortError') input.list?.replaceChildren(); }
+    }
+    input.addEventListener('focus', loadIssues);
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      controller?.abort();
+      timer = setTimeout(loadIssues, 180);
+    });
+  });
+
   const editor = $('#cellEditor');
   function wrapSelection(before, after = before) {
     if (!editor) return;
