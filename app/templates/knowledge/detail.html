@@ -24,7 +24,7 @@
       <a class="strong-link" href="{{ url_for('main.issue_detail',issue_id=issue.id) }}">{{ issue.title }}</a>
       <p class="knowledge-source-note">{{ '由问题 Cell 沉淀' if entry.source_cell_id else '在知识库关联' }} · 状态：{{ issue.status }}</p>
       {% if entry.source_cell and not entry.source_cell.deleted_at %}<a class="text-button" href="{{ url_for('main.issue_detail',issue_id=issue.id,cell=entry.source_cell.id) }}">查看来源 Cell →</a>{% endif %}
-      {% if issue.pcb %}<p class="knowledge-source-note">板卡：{{ issue.pcb.model or '未填写型号' }} · {{ issue.pcb.revision or '未填写版本' }} · {{ issue.pcb.serial }}</p>{% endif %}
+      {% if issue.pcb %}<p class="knowledge-source-note">板卡：{{ issue.pcb|pcb_label }}</p>{% endif %}
       {% if issue.current_summary or issue.description %}<p class="knowledge-source-note">问题背景：{{ (issue.current_summary or issue.description)[:300] }}</p>{% endif %}
       {% else %}<p class="knowledge-source-note">{{ '原问题已移入回收站' if entry.source_issue_id else '独立知识记录，可通过编辑关联已有问题' }}</p>{% endif %}
     </section>

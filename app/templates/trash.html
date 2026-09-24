@@ -14,7 +14,7 @@
 </section>
 <section class="panel section-gap">
   <div class="panel-head"><h2>PCB</h2><span class="count-pill">{{ pcbs|length }}</span></div>
-  {% for row in pcbs %}<div class="trash-row"><div><strong>{{ row.model or row.serial }}</strong><small>PCB序列号：{{ row.serial }} · {{ row.deleted_at|cn_time }}</small></div><form action="{{ url_for('main.trash_restore',entity='pcb',entity_id=row.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="secondary-button">恢复</button></form></div>{% else %}<div class="empty-state small">没有已删除 PCB。</div>{% endfor %}
+  {% for row in pcbs %}<div class="trash-row"><div><strong>{{ row.model or row.serial }}</strong><small>{{ row|pcb_label(false) }} · {{ row.deleted_at|cn_time }}</small></div><form action="{{ url_for('main.trash_restore',entity='pcb',entity_id=row.id) }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="secondary-button">恢复</button></form></div>{% else %}<div class="empty-state small">没有已删除 PCB。</div>{% endfor %}
 </section>
 <section class="panel section-gap">
   <div class="panel-head"><h2>问题</h2><span class="count-pill">{{ issues|length }}</span></div>

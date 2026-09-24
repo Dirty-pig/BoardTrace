@@ -43,7 +43,7 @@ def test_pcb_issue_cell_image_and_api(app, initialized_client):
 
     issues_page = initialized_client.get("/issues").get_data(as_text=True)
     assert "<span>板卡型号（可选）</span>" in issues_page
-    assert "CTRL-A · PCB序列号：PCB-2026-0001" in issues_page
+    assert "CTRL-A - V1.2 - PCB-2026-0001" in issues_page
     assert "<span>▤</span>板卡型号</a>" in issues_page
 
     response = initialized_client.post("/issues", data={

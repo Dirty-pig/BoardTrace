@@ -7,6 +7,7 @@ from flask import Blueprint, abort, current_app, flash, redirect, render_templat
 from flask_login import current_user, login_required
 from sqlalchemy import func, literal, select, union_all
 
+from .display import pcb_label
 from .extensions import db
 from .issue_workflow import CELL_KINDS, ISSUE_STATUSES, PRIORITIES, apply_cell_status, duration_label, elapsed_seconds, set_issue_status
 from .models import ActiveTimer, Attachment, AuditLog, Cell, DailySummary, Issue, KnowledgeEntry, ObjectCell, PCB, Project, SystemSetting, User, WorkLog, utcnow
@@ -533,7 +534,7 @@ def search():
     results = []
     if q:
         like = f"%{q}%"
-        results.extend({"type": "板卡", "title": row.model or "未填写型号", "snippet": f"PCB序列号：{row.serial} {row.revision}", "url": url_for("main.pcb_detail", pcb_id=row.id)} for row in PCB.query.filter(PCB.deleted_at.is_(None), db.or_(PCB.serial.ilike(like), PCB.model.ilike(like))).limit(20))
+        results.extend({"type": "板卡", "title": row.model or "未填写型号", "snippet": pcb_label(row, include_model=False), "url": url_for("main.pcb_detail", pcb_id=row.id)} for row in PCB.query.filter(PCB.deleted_at.is_(None), db.or_(PCB.serial.ilike(like), PCB.model.ilike(like))).limit(20))
         results.extend({"type": "项目", "title": row.name, "snippet": row.objective[:200], "url": url_for("main.project_detail", project_id=row.id)} for row in Project.query.filter(Project.deleted_at.is_(None), db.or_(Project.name.ilike(like), Project.objective.ilike(like))).limit(20))
         results.extend({"type": "问题", "title": row.title, "snippet": (row.description or row.current_summary)[:200], "url": url_for("main.issue_detail", issue_id=row.id)} for row in Issue.query.filter(Issue.deleted_at.is_(None), db.or_(Issue.title.ilike(like), Issue.description.ilike(like), Issue.tags.ilike(like))).limit(20))
         results.extend({"type": "知识", "title": row.title, "snippet": row.content_md[:200], "url": url_for("knowledge.detail", entry_id=row.id)} for row in KnowledgeEntry.query.filter(KnowledgeEntry.deleted_at.is_(None), db.or_(KnowledgeEntry.title.ilike(like), KnowledgeEntry.content_md.ilike(like))).limit(20))
