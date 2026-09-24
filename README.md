@@ -44,6 +44,8 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
+> 提示：项目主要在 Conda 环境（见 `environment.yml`）下开发测试。直接使用 Python `venv` 不一定会遇到依赖冲突；若安装或运行时出现兼容问题，建议改用 Conda 环境。
+
 双击 `启动服务.cmd`：仅在后台启动服务，重复点击不会启动第二个服务器。然后双击 `打开板迹.cmd`：仅打开无普通浏览器地址栏的独立窗口，不会启动服务。关闭窗口不会停止服务。Windows 重启后需再次运行“启动服务”；脚本不会自行设置开机启动。
 
 也可以直接用浏览器访问 <http://127.0.0.1:5000>。旧的 `scripts/start_server.ps1` 是占用当前终端的前台启动方式。
