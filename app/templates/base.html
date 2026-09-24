@@ -64,7 +64,7 @@
       <form action="{{ url_for('main.issues') }}" method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label class="field"><span>标题 <b>*</b></span><input name="title" required placeholder="用一句话描述当前问题"></label>
-        <label class="field"><span>板卡型号（可选）</span><select name="pcb_id"><option value="">暂不归类</option>{% for item in quick_pcbs|default([]) %}<option value="{{ item.id }}" {{ 'selected' if pcb is defined and pcb.id == item.id }}>{{ item.model or '未填写型号' }} · PCB序列号：{{ item.serial }}</option>{% endfor %}</select></label>
+        <label class="field"><span>板卡型号（可选）</span><select name="pcb_id"><option value="">暂不归类</option>{% for item in quick_pcbs|default([]) %}<option value="{{ item.id }}" {{ 'selected' if pcb is defined and pcb.id == item.id }}>{{ item.model or '未填写型号' }} · 版本号：{{ item.revision or '未填写' }} · PCB序列号：{{ item.serial }}</option>{% endfor %}</select></label>
         <label class="field"><span>现象（可选）</span><textarea name="description" placeholder="创建后可继续追加Cell"></textarea></label>
         <div class="modal-foot"><span>只需填写标题即可创建</span><div><button class="secondary-button" type="button" data-modal-close>取消</button><button class="primary-button" type="submit">创建问题</button></div></div>
       </form>
@@ -76,7 +76,7 @@
       <form action="{{ url_for('main.timer_start') }}" method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label class="field"><span>正在做什么 <b>*</b></span><input name="title" required placeholder="例如：复测PHASE波形"></label>
-        <label class="field"><span>板卡型号（可选）</span><select name="pcb_id"><option value="">暂不关联</option>{% for item in quick_pcbs|default([]) %}<option value="{{ item.id }}" {{ 'selected' if pcb is defined and pcb.id == item.id }}>{{ item.model or '未填写型号' }} · PCB序列号：{{ item.serial }}</option>{% endfor %}</select></label>
+        <label class="field"><span>板卡型号（可选）</span><select name="pcb_id"><option value="">暂不关联</option>{% for item in quick_pcbs|default([]) %}<option value="{{ item.id }}" {{ 'selected' if pcb is defined and pcb.id == item.id }}>{{ item.model or '未填写型号' }} · 版本号：{{ item.revision or '未填写' }} · PCB序列号：{{ item.serial }}</option>{% endfor %}</select></label>
         <div class="modal-foot"><span>同一时间仅保留一个计时器</span><div><button class="secondary-button" type="button" data-modal-close>取消</button><button class="primary-button" type="submit">开始</button></div></div>
       </form>
     </section>
