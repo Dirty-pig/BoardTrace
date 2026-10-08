@@ -39,6 +39,38 @@ def test_knowledge_cell_is_searchable_and_keeps_an_issue_link(app, initialized_c
     assert initialized_client.get("/api/v1/knowledge?q=低感").json["items"][0]["title"] == "低感接地方法"
 
 
+def test_knowledge_cell_renders_full_current_body_in_list_and_focus(app, initialized_client):
+    from app.models import KnowledgeEntry
+
+    created = initialized_client.post("/issues", data={"title": "知识渲染"})
+    issue_id = int(created.headers["Location"].rstrip("/").split("/")[-1])
+    content = "**加粗结论**\n\n| 项目 | 结果 |\n| --- | --- |\n| 电源 | 第一行<br>第二行 |\n\n" + "完整正文" * 60 + "末尾标记<script>alert(1)</script>"
+    initialized_client.post(
+        f"/issues/{issue_id}/cells",
+        data={"kind": "知识积累", "title": "渲染的知识", "content": content},
+    )
+    with app.app_context():
+        entry = KnowledgeEntry.query.one()
+        entry_id, cell_id = entry.id, entry.source_cell_id
+
+    for url in (f"/issues/{issue_id}", f"/issues/{issue_id}?cell={cell_id}"):
+        page = initialized_client.get(url).get_data(as_text=True)
+        assert "<strong>加粗结论</strong>" in page
+        assert "<table>" in page
+        assert "第一行<br>第二行" in page
+        assert "末尾标记" in page
+        assert "<script>alert(1)</script>" not in page
+        assert f'href="/knowledge/{entry_id}"' in page
+
+    initialized_client.post(
+        f"/knowledge/{entry_id}/update",
+        data={"title": "渲染的知识", "content": "**更新后的正文**"},
+    )
+    page = initialized_client.get(f"/issues/{issue_id}").get_data(as_text=True)
+    assert "<strong>更新后的正文</strong>" in page
+    assert "<strong>加粗结论</strong>" not in page
+
+
 def test_standalone_knowledge_title_required_and_list_paginated(app, initialized_client):
     assert initialized_client.post("/knowledge", data={"title": "", "content": "正文"}).status_code != 500
     with app.app_context():

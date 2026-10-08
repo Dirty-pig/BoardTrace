@@ -40,7 +40,10 @@
         <div>
           <div class="chat-meta"><strong>{{ cell.author.username if cell.author else 'ROOT' }}</strong><time>{{ cell.created_at|cn_time('%m-%d %H:%M') }}</time><span class="tag {{ 'orange' if cell.kind=='测试记录' else 'blue' }}">{{ cell.kind }}</span><a class="cell-focus-link" href="{{ url_for('main.issue_detail',issue_id=issue.id,cell=cell.id) }}" aria-label="单独查看 Cell {{ cell.id }}">单独查看</a>{% if cell.kind != '状态变化' %}<form class="cell-delete-form" action="{{ url_for('main.cell_trash',issue_id=issue.id,cell_id=cell.id) }}" method="post" data-confirm="{{ '将这条 Cell 移入回收站？独立知识条目会保留。' if cell.kind == '知识积累' else '将这条 Cell 移入回收站？可在回收站恢复。' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="cell-delete-button" aria-label="删除 Cell {{ cell.id }}">删除</button></form>{% endif %}</div>
           <div class="chat-bubble">
-            {% if cell.kind == '知识积累' and cell.knowledge_entry %}<a class="knowledge-cell-link" href="/knowledge/{{ cell.knowledge_entry.id }}"><strong>{{ cell.knowledge_entry.title }}</strong><span>{{ cell.knowledge_entry.content_md[:180] }}{{ '…' if cell.knowledge_entry.content_md|length > 180 }}</span><small>打开知识条目 →</small></a>{% else %}<div class="rich-content">{{ cell.rendered_html|safe }}</div>{% endif %}
+            {% if cell.kind == '知识积累' and cell.knowledge_entry %}
+            <a class="knowledge-cell-link" href="{{ url_for('knowledge.detail',entry_id=cell.knowledge_entry.id) }}"><strong>{{ cell.knowledge_entry.title }}</strong><small>打开知识条目 →</small></a>
+            <div class="rich-content">{{ cell.knowledge_entry.rendered_html|safe }}</div>
+            {% else %}<div class="rich-content">{{ cell.rendered_html|safe }}</div>{% endif %}
             {% if cell.attachments.filter_by(deleted_at=None).count() %}
             <div class="attachment-grid">
               {% for attachment in cell.attachments.filter_by(deleted_at=None).all() %}
