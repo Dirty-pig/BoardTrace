@@ -200,7 +200,8 @@ figcaption { padding: 6px 8px; font-size: 10px; color: var(--muted); }
 .issue-summary h2 { font-size: 15px; }
 .issue-summary p { line-height: 1.65; margin-bottom: 7px; }
 mark { background: #fff2a8; padding: 1px 3px; border-radius: 2px; }
-.chat-cell { display: grid; grid-template-columns: 34px 1fr; gap: 10px; margin-bottom: 17px; }
+.chat-cell { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; margin-bottom: 17px; }
+.chat-cell > div { min-width: 0; }
 .cell-avatar { width: 30px; height: 30px; font-size: 11px; }
 .chat-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 5px; }
 .chat-meta time { color: var(--muted); }
