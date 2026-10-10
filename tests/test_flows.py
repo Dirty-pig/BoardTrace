@@ -2,7 +2,8 @@ from io import BytesIO
 
 from PIL import Image
 
-from app.models import Attachment, AuditLog, Cell, Issue, PCB, User
+from app.extensions import db
+from app.models import Attachment, AuditLog, Cell, Issue, PCB, User, WorkLog
 from app.services import run_backup
 
 
@@ -27,6 +28,56 @@ def test_root_initialization_and_dashboard(app, initialized_client):
         user = User.query.one()
         assert user.role == "root"
         assert user.password_hash.startswith("$argon2")
+
+
+def test_dashboard_prioritizes_open_issues_and_pcbs(app, initialized_client):
+    with app.app_context():
+        user = User.query.one()
+        active_pcb = PCB(serial="ACTIVE", model="Active board", created_by_id=user.id)
+        inactive_pcb = PCB(serial="INACTIVE", model="Inactive board", created_by_id=user.id)
+        db.session.add_all([active_pcb, inactive_pcb])
+        db.session.flush()
+        db.session.add_all([
+            Issue(title="Open issue", status="处理中", pcb_id=active_pcb.id, created_by_id=user.id),
+            Issue(title="Resolved issue", status="已解决", pcb_id=inactive_pcb.id, created_by_id=user.id),
+        ])
+        db.session.commit()
+        # The recently updated resolved items must still follow active work.
+        inactive_pcb.updated_at = active_pcb.updated_at.replace(year=active_pcb.updated_at.year + 1)
+        resolved = Issue.query.filter_by(title="Resolved issue").one()
+        open_issue = Issue.query.filter_by(title="Open issue").one()
+        resolved.updated_at = open_issue.updated_at.replace(year=open_issue.updated_at.year + 1)
+        db.session.commit()
+
+    page = initialized_client.get("/").get_data(as_text=True)
+    assert page.index("Active board") < page.index("Inactive board")
+    assert page.index("Open issue") < page.index("Resolved issue")
+    assert 'href="/work?date=today"' in page
+    assert 'href="/issues?status=open"' in page
+    assert 'href="/issues?status=%E7%AD%89%E5%BE%85%E4%B8%AD"' in page
+
+    open_page = initialized_client.get("/issues?status=open").get_data(as_text=True)
+    assert "Open issue" in open_page
+    assert "Resolved issue" not in open_page
+
+
+def test_today_work_card_filters_work_logs(app, initialized_client):
+    from datetime import timedelta
+    from app.models import utcnow
+
+    with app.app_context():
+        user = User.query.one()
+        db.session.add_all([
+            WorkLog(title="Today work", minutes=25, user_id=user.id),
+            WorkLog(title="Yesterday work", minutes=30, user_id=user.id,
+                    created_at=utcnow() - timedelta(days=1)),
+        ])
+        db.session.commit()
+
+    page = initialized_client.get("/work?date=today").get_data(as_text=True)
+    assert "今日工作记录" in page
+    assert "Today work" in page
+    assert "Yesterday work" not in page
 
 
 def test_pcb_issue_cell_image_and_api(app, initialized_client):

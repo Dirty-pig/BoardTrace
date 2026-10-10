@@ -82,7 +82,17 @@
     </section>
   </div>
   <div class="toast" id="toast"></div>
-  <dialog class="image-viewer" id="imageViewer" aria-label="图片预览"><div class="image-viewer-toolbar"><a id="imageViewerDownload" class="secondary-button" href="#">下载原图</a><form method="dialog"><button class="secondary-button" aria-label="关闭图片预览">关闭 ×</button></form></div><img id="imageViewerImage" alt="图片预览"></dialog>
+  <dialog class="image-viewer" id="imageViewer" aria-label="图片预览">
+    <div class="image-viewer-toolbar">
+      <span class="image-viewer-hint">滚轮缩放 · 放大后拖动图片</span>
+      <button type="button" class="secondary-button" data-image-zoom="out" aria-label="缩小图片">−</button>
+      <button type="button" class="secondary-button image-viewer-scale" data-image-zoom="reset" aria-label="重置图片缩放">100%</button>
+      <button type="button" class="secondary-button" data-image-zoom="in" aria-label="放大图片">＋</button>
+      <a id="imageViewerDownload" class="secondary-button" href="#">下载原图</a>
+      <form method="dialog"><button class="secondary-button" aria-label="关闭图片预览">关闭 ×</button></form>
+    </div>
+    <div class="image-viewer-stage" id="imageViewerStage"><img id="imageViewerImage" alt="图片预览" draggable="false"></div>
+  </dialog>
   <script src="{{ url_for('static', filename='backend.js') }}"></script>
   {% block scripts %}{% endblock %}
 </body>

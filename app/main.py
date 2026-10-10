@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from datetime import date, datetime
 from pathlib import Path
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_login import current_user, login_required
-from sqlalchemy import func, literal, select, union_all
+from sqlalchemy import case, exists, func, literal, select, union_all
 
 from .display import pcb_label
 from .extensions import db
 from .issue_workflow import CELL_KINDS, ISSUE_STATUSES, PRIORITIES, apply_cell_status, duration_label, elapsed_seconds, set_issue_status
 from .models import ActiveTimer, Attachment, AuditLog, Cell, DailySummary, Issue, KnowledgeEntry, ObjectCell, PCB, Project, SystemSetting, User, WorkLog, utcnow
 from .services import audit, build_daily_summary, export_pcb, render_markdown, run_backup, save_attachment, setting, set_setting
+from .time_utils import local_today, utc_day_bounds
 
 
 bp = Blueprint("main", __name__)
@@ -40,23 +40,35 @@ def _pagination(query, default_order):
 @bp.get("/")
 @login_required
 def dashboard():
-    today = date.today()
-    day_start = datetime.combine(today, datetime.min.time())
-    work_today = WorkLog.query.filter(WorkLog.deleted_at.is_(None), WorkLog.created_at >= day_start).all()
+    today = local_today()
+    day_start, day_end = utc_day_bounds(today)
+    work_today = WorkLog.query.filter(WorkLog.deleted_at.is_(None), WorkLog.created_at >= day_start, WorkLog.created_at < day_end).all()
     cells_today = (
-        Cell.query.filter(Cell.deleted_at.is_(None), Cell.created_at >= day_start).count()
-        + ObjectCell.query.filter(ObjectCell.deleted_at.is_(None), ObjectCell.created_at >= day_start).count()
+        Cell.query.filter(Cell.deleted_at.is_(None), Cell.created_at >= day_start, Cell.created_at < day_end).count()
+        + ObjectCell.query.filter(ObjectCell.deleted_at.is_(None), ObjectCell.created_at >= day_start, ObjectCell.created_at < day_end).count()
     )
     open_issues = Issue.query.filter(Issue.deleted_at.is_(None), Issue.status != "已解决").count()
     waiting = Issue.query.filter_by(status="等待中", deleted_at=None).count()
-    recent_pcbs = PCB.query.filter(PCB.deleted_at.is_(None)).order_by(PCB.updated_at.desc()).limit(8).all()
-    recent_issues = Issue.query.filter(Issue.deleted_at.is_(None)).order_by(Issue.updated_at.desc()).limit(8).all()
+    has_open_issue = exists().where(
+        Issue.pcb_id == PCB.id, Issue.deleted_at.is_(None), Issue.status != "已解决"
+    )
+    recent_pcbs = PCB.query.filter(PCB.deleted_at.is_(None)).order_by(
+        case((has_open_issue, 0), else_=1), PCB.updated_at.desc(), PCB.id.desc()
+    ).limit(8).all()
+    recent_pcb_open_counts = dict(
+        db.session.query(Issue.pcb_id, func.count(Issue.id))
+        .filter(Issue.pcb_id.in_([pcb.id for pcb in recent_pcbs]), Issue.deleted_at.is_(None), Issue.status != "已解决")
+        .group_by(Issue.pcb_id).all()
+    )
+    recent_issues = Issue.query.filter(Issue.deleted_at.is_(None)).order_by(
+        case((Issue.status == "已解决", 1), else_=0), Issue.updated_at.desc(), Issue.id.desc()
+    ).limit(5).all()
     recent_logs = WorkLog.query.filter(WorkLog.deleted_at.is_(None)).order_by(WorkLog.created_at.desc()).limit(8).all()
     unfiled = Issue.query.filter_by(pcb_id=None, project_id=None, deleted_at=None).order_by(Issue.created_at.desc()).limit(5).all()
     summary = DailySummary.query.filter_by(summary_date=today).first()
     return render_template(
         "dashboard.html", today=today, total_minutes=sum(row.minutes for row in work_today), cells_today=cells_today,
-        open_issues=open_issues, waiting=waiting, recent_pcbs=recent_pcbs, recent_issues=recent_issues,
+        open_issues=open_issues, waiting=waiting, recent_pcbs=recent_pcbs, recent_pcb_open_counts=recent_pcb_open_counts, recent_issues=recent_issues,
         recent_logs=recent_logs, unfiled=unfiled, summary=summary,
     )
 
@@ -318,7 +330,9 @@ def issues():
     query = Issue.query.filter(Issue.deleted_at.is_(None))
     status = request.args.get("status", "")
     priority = request.args.get("priority", "")
-    if status:
+    if status == "open":
+        query = query.filter(Issue.status != "已解决")
+    elif status:
         query = query.filter_by(status=status)
     if priority:
         query = query.filter_by(priority=priority)
@@ -491,8 +505,13 @@ def work_logs():
             db.session.commit()
             flash("工作记录已保存。", "success")
             return redirect(url_for("main.work_logs"))
-    pagination = _pagination(WorkLog.query.filter(WorkLog.deleted_at.is_(None)), WorkLog.created_at.desc())
-    return render_template("work/list.html", pagination=pagination, pcbs=PCB.query.filter_by(deleted_at=None).order_by(PCB.updated_at.desc()).limit(100).all(), projects=Project.query.filter_by(deleted_at=None).order_by(Project.updated_at.desc()).limit(100).all(), issues=Issue.query.filter_by(deleted_at=None).order_by(Issue.updated_at.desc()).limit(100).all())
+    work_query = WorkLog.query.filter(WorkLog.deleted_at.is_(None))
+    today_only = request.args.get("date") == "today"
+    if today_only:
+        day_start, day_end = utc_day_bounds(local_today())
+        work_query = work_query.filter(WorkLog.created_at >= day_start, WorkLog.created_at < day_end)
+    pagination = _pagination(work_query, WorkLog.created_at.desc())
+    return render_template("work/list.html", pagination=pagination, today_only=today_only, pcbs=PCB.query.filter_by(deleted_at=None).order_by(PCB.updated_at.desc()).limit(100).all(), projects=Project.query.filter_by(deleted_at=None).order_by(Project.updated_at.desc()).limit(100).all(), issues=Issue.query.filter_by(deleted_at=None).order_by(Issue.updated_at.desc()).limit(100).all())
 
 
 @bp.post("/timer/start")
@@ -572,7 +591,7 @@ def attachment_file(attachment_id, kind):
 @bp.post("/summary/generate")
 @login_required
 def summary_generate():
-    summary = build_daily_summary(date.today())
+    summary = build_daily_summary(local_today())
     audit("summary.generate", summary)
     db.session.commit()
     flash("今日汇总草稿已生成。", "success")

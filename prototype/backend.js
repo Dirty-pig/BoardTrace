@@ -186,17 +186,80 @@
   const imageViewer = $('#imageViewer');
   const viewerImage = $('#imageViewerImage');
   const viewerDownload = $('#imageViewerDownload');
+  const viewerStage = $('#imageViewerStage');
+  const viewerScale = $('[data-image-zoom="reset"]', imageViewer || document);
+  let imageScale = 1;
+  let imageX = 0;
+  let imageY = 0;
+  let imageDrag = null;
+  function updateImageTransform() {
+    if (!viewerImage || !viewerStage || !viewerStage.clientWidth || !viewerStage.clientHeight) return;
+    const fit = Math.min(viewerStage.clientWidth / (viewerImage.naturalWidth || viewerStage.clientWidth), viewerStage.clientHeight / (viewerImage.naturalHeight || viewerStage.clientHeight));
+    const width = (viewerImage.naturalWidth || viewerStage.clientWidth) * fit;
+    const height = (viewerImage.naturalHeight || viewerStage.clientHeight) * fit;
+    imageX = Math.max(-Math.max(0, (width * imageScale - viewerStage.clientWidth) / 2), Math.min(imageX, Math.max(0, (width * imageScale - viewerStage.clientWidth) / 2)));
+    imageY = Math.max(-Math.max(0, (height * imageScale - viewerStage.clientHeight) / 2), Math.min(imageY, Math.max(0, (height * imageScale - viewerStage.clientHeight) / 2)));
+    viewerImage.style.transform = `translate(${imageX}px, ${imageY}px) scale(${imageScale})`;
+    viewerStage.classList.toggle('is-zoomed', imageScale > 1);
+    viewerScale.textContent = `${Math.round(imageScale * 100)}%`;
+  }
+  function zoomImage(nextScale, clientX, clientY) {
+    if (!viewerStage) return;
+    const scale = Math.max(1, Math.min(8, nextScale));
+    const bounds = viewerStage.getBoundingClientRect();
+    const x = clientX - bounds.left - bounds.width / 2;
+    const y = clientY - bounds.top - bounds.height / 2;
+    const ratio = scale / imageScale;
+    imageX = x - (x - imageX) * ratio;
+    imageY = y - (y - imageY) * ratio;
+    imageScale = scale;
+    updateImageTransform();
+  }
+  function resetImage() {
+    imageScale = 1; imageX = 0; imageY = 0;
+    updateImageTransform();
+  }
   document.addEventListener('click', event => {
     const link = event.target.closest('a[data-preview-url]');
-    if (!link || !imageViewer || !viewerImage || !viewerDownload) return;
+    if (!link || !imageViewer || !viewerImage || !viewerDownload || !viewerStage) return;
     event.preventDefault();
+    resetImage();
     viewerImage.src = link.dataset.previewUrl;
     viewerImage.alt = link.querySelector('img')?.alt || '图片预览';
     viewerDownload.href = link.href;
     imageViewer.showModal();
+    resetImage();
   });
+  viewerImage?.addEventListener('load', updateImageTransform);
+  imageViewer?.addEventListener('wheel', event => {
+    event.preventDefault();
+    if (!viewerStage.contains(event.target)) return;
+    const delta = Math.max(-240, Math.min(240, event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewerStage.clientHeight : 1)));
+    zoomImage(imageScale * Math.exp(-delta * 0.0015), event.clientX, event.clientY);
+  }, { passive: false });
+  $$('[data-image-zoom]', imageViewer || document).forEach(button => button.addEventListener('click', () => {
+    if (button.dataset.imageZoom === 'reset') { resetImage(); return; }
+    const bounds = viewerStage.getBoundingClientRect();
+    zoomImage(imageScale * (button.dataset.imageZoom === 'in' ? 1.25 : 0.8), bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+  }));
+  viewerStage?.addEventListener('pointerdown', event => {
+    if (imageScale <= 1 || event.button !== 0) return;
+    imageDrag = { x: event.clientX, y: event.clientY, imageX, imageY };
+    viewerStage.setPointerCapture(event.pointerId);
+    viewerStage.classList.add('is-dragging');
+  });
+  viewerStage?.addEventListener('pointermove', event => {
+    if (!imageDrag) return;
+    imageX = imageDrag.imageX + event.clientX - imageDrag.x;
+    imageY = imageDrag.imageY + event.clientY - imageDrag.y;
+    updateImageTransform();
+  });
+  function stopImageDrag() { imageDrag = null; viewerStage?.classList.remove('is-dragging'); }
+  viewerStage?.addEventListener('pointerup', stopImageDrag);
+  viewerStage?.addEventListener('pointercancel', stopImageDrag);
+  window.addEventListener('resize', () => { if (imageViewer?.open) updateImageTransform(); });
   imageViewer?.addEventListener('click', event => { if (event.target === imageViewer) imageViewer.close(); });
-  imageViewer?.addEventListener('close', () => { viewerImage.removeAttribute('src'); });
+  imageViewer?.addEventListener('close', () => { stopImageDrag(); viewerImage.removeAttribute('src'); resetImage(); });
 
   $$('[data-timer-start]').forEach(label => {
     const start = new Date(`${label.dataset.timerStart}Z`).getTime();

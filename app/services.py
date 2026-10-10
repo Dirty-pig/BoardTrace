@@ -18,6 +18,7 @@ from werkzeug.utils import secure_filename
 
 from .extensions import db
 from .models import Attachment, AuditLog, Cell, DailySummary, Issue, ObjectCell, PCB, SystemSetting, WorkLog, utcnow
+from .time_utils import utc_day_bounds
 
 
 DEFAULT_SETTINGS = {
@@ -144,11 +145,10 @@ def save_attachment(file_storage, *, issue=None, cell=None, object_cell=None, pc
 
 
 def build_daily_summary(target_date: date):
-    start = datetime.combine(target_date, datetime.min.time())
-    end = datetime.combine(target_date, datetime.max.time())
-    logs = WorkLog.query.filter(WorkLog.deleted_at.is_(None), WorkLog.created_at.between(start, end)).order_by(WorkLog.created_at).all()
-    cells = Cell.query.filter(Cell.deleted_at.is_(None), Cell.created_at.between(start, end)).order_by(Cell.created_at).all()
-    object_cells = ObjectCell.query.filter(ObjectCell.deleted_at.is_(None), ObjectCell.created_at.between(start, end)).order_by(ObjectCell.created_at).all()
+    start, end = utc_day_bounds(target_date)
+    logs = WorkLog.query.filter(WorkLog.deleted_at.is_(None), WorkLog.created_at >= start, WorkLog.created_at < end).order_by(WorkLog.created_at).all()
+    cells = Cell.query.filter(Cell.deleted_at.is_(None), Cell.created_at >= start, Cell.created_at < end).order_by(Cell.created_at).all()
+    object_cells = ObjectCell.query.filter(ObjectCell.deleted_at.is_(None), ObjectCell.created_at >= start, ObjectCell.created_at < end).order_by(ObjectCell.created_at).all()
     minutes = sum(log.minutes for log in logs)
     completed = [f"- {log.title}" + (f"：{log.result}" if log.result else "") for log in logs]
     progress = [f"- [{cell.issue.title}] {cell.kind}：{cell.content_md[:180]}" for cell in cells if cell.kind in {"测试记录", "当前判断", "阶段结论"}]

@@ -1,0 +1,10 @@
+BoardTrace (板迹) Windows 免安装版
+
+1. 把整个 BoardTrace 文件夹解压到可写位置，例如“文档”。不要只复制 BoardTrace.exe。
+2. 双击“启动板迹便携版.cmd”，默认浏览器会打开 http://127.0.0.1:5000 。首次使用时创建 ROOT 账号。
+3. 关闭浏览器窗口不会停止服务。需要停止时，双击“停止板迹便携版.cmd”。
+4. 数据、密钥、附件和备份保存在本文件夹的 data 目录。升级程序时先备份 data，不要用新版程序覆盖它。
+5. 本包默认仅允许本机访问，不会自动开放局域网或公网。
+6. 如果 Windows 应用程序控制策略阻止 BoardTrace.exe，双击“检查启动拦截便携版.cmd”，将 data/logs/app-control-report.txt 中与 BoardTrace.exe 有关的事件交给电脑管理员审核。不要关闭应用控制策略。
+
+目标电脑需要 Windows x64；无需预装 Python 或 Docker。端口 5000 若被其他程序占用，启动脚本会报错。

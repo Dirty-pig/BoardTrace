@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY requirements-web.txt ./
-RUN pip install --no-cache-dir -r requirements-web.txt
+RUN pip install --no-cache-dir --no-compile -r requirements-web.txt
 
 COPY app ./app
 COPY prototype ./prototype
