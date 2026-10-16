@@ -16,7 +16,7 @@ def test_pcb_list_searches_serial_only(app, initialized_client):
     page = initialized_client.get("/pcbs?q=MATCH").get_data(as_text=True)
     listing = page.split('<section class="panel table-panel">', 1)[1].split("</section>", 1)[0]
     assert "仅按 PCB 序列号搜索" in page
-    assert "MATCH-003" in listing
+    assert '<mark class="search-match">MATCH</mark>-003' in listing
     assert "PCB-001" not in listing
     assert "PCB-002" not in listing
     assert 'data-pcb-cascade' not in page

@@ -34,13 +34,15 @@
     '阶段结论': '发送后进入「待验证」。', '结论及复盘': '发送后自动标记「已解决」，历时停止。',
     '知识积累': '保存为独立知识条目，并在问题时间线保留入口；不改变问题状态。'
   };
-  const kindSelect = document.querySelector('.backend-composer select[name="kind"]');
+  const kindSelect = document.querySelector('.backend-composer select[name="kind"], .object-composer select[name="kind"]');
   const kindHint = $('#cellKindHint');
   const knowledgeTitleField = $('#knowledgeTitleField');
   const knowledgeTitle = $('#knowledgeTitle');
   const refreshKind = () => {
     const isKnowledge = kindSelect?.value === '知识积累';
-    if (kindHint) kindHint.textContent = kindHints[kindSelect.value] || '此类型不改变问题状态。';
+    if (kindHint) kindHint.textContent = isKnowledge && kindSelect?.closest('.object-composer')
+      ? `保存为独立知识条目，并在${kindSelect.closest('form')?.action.includes('/pcbs/') ? '板卡' : '项目'}时间线保留入口。`
+      : (kindHints[kindSelect.value] || '此类型不改变问题状态。');
     if (knowledgeTitleField) knowledgeTitleField.hidden = !isKnowledge;
     if (knowledgeTitle) knowledgeTitle.required = isKnowledge;
   };
@@ -71,7 +73,7 @@
       lookupController = new AbortController();
       try {
         const rows = await fetch(`/api/v1/pcbs?q=${encodeURIComponent(q)}&limit=10`, {signal: lookupController.signal}).then(r => r.json());
-        menu.innerHTML = rows.length ? rows.map(row => `<a class="lookup-result" href="/pcbs/${row.id}"><span><strong>${escapeHtml(row.model || '未填写型号')}</strong><small>${escapeHtml([row.revision, row.serial].map(value => value?.trim() || '\u00a0\u00a0\u00a0').join(' - '))}</small></span><small>${escapeHtml(row.status)}</small></a>`).join('') : '<div class="lookup-result"><small>没有匹配的PCB</small></div>';
+        menu.innerHTML = rows.length ? rows.map(row => `<a class="lookup-result" href="/pcbs/${row.id}"><span><strong>${highlightLookup(row.model || '未填写型号', q)}</strong><small>${highlightLookup([row.revision, row.serial].map(value => value?.trim() || '\u00a0\u00a0\u00a0').join(' - '), q)}</small></span><small>${escapeHtml(row.status)}</small></a>`).join('') : '<div class="lookup-result"><small>没有匹配的PCB</small></div>';
         menu.classList.add('show');
       } catch (error) { if (error.name !== 'AbortError') menu.classList.remove('show'); }
     });
@@ -79,6 +81,18 @@
   }
 
   function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char])); }
+  function highlightLookup(value, query) {
+    const source = String(value);
+    const lowerSource = source.toLocaleLowerCase();
+    const lowerQuery = query.toLocaleLowerCase();
+    let cursor = 0, match, result = '';
+    while ((match = lowerSource.indexOf(lowerQuery, cursor)) !== -1) {
+      result += escapeHtml(source.slice(cursor, match));
+      result += `<mark class="search-match">${escapeHtml(source.slice(match, match + query.length))}</mark>`;
+      cursor = match + query.length;
+    }
+    return result + escapeHtml(source.slice(cursor));
+  }
 
   $$('[data-knowledge-issue-picker]').forEach(input => {
     let timer;

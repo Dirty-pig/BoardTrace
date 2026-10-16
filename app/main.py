@@ -15,7 +15,7 @@ from .time_utils import local_today, utc_day_bounds
 
 
 bp = Blueprint("main", __name__)
-OBJECT_CELL_KINDS = tuple(kind for kind in CELL_KINDS if kind != "知识积累")
+OBJECT_CELL_KINDS = CELL_KINDS
 
 
 @bp.app_context_processor
@@ -163,10 +163,26 @@ def _create_object_cell(*, pcb=None, project=None):
     return cell
 
 
+def _create_knowledge_object_cell(*, pcb=None, project=None):
+    from .knowledge import create_entry
+
+    files = [file for file in request.files.getlist("attachments") if file and file.filename]
+    try:
+        create_entry(request.form.get("title", ""), request.form.get("content", ""), pcb=pcb, project=project, files=files)
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    else:
+        flash("知识已保存到知识库。", "success")
+
+
 @bp.post("/pcbs/<int:pcb_id>/cells")
 @login_required
 def pcb_cell_create(pcb_id):
     pcb = PCB.query.filter_by(id=pcb_id, deleted_at=None).first_or_404()
+    if request.form.get("kind") == "知识积累":
+        _create_knowledge_object_cell(pcb=pcb)
+        return redirect(url_for("main.pcb_detail", pcb_id=pcb.id))
     try:
         _create_object_cell(pcb=pcb)
     except ValueError as exc:
@@ -261,6 +277,9 @@ def project_pcbs_update(project_id):
 @login_required
 def project_cell_create(project_id):
     project = Project.query.filter_by(id=project_id, deleted_at=None).first_or_404()
+    if request.form.get("kind") == "知识积累":
+        _create_knowledge_object_cell(project=project)
+        return redirect(url_for("main.project_detail", project_id=project.id))
     try:
         _create_object_cell(project=project)
     except ValueError as exc:
@@ -273,7 +292,7 @@ def project_cell_create(project_id):
 
 def _trash_cell(cell, action):
     cell.deleted_at = utcnow()
-    if not (isinstance(cell, Cell) and cell.knowledge_entry and cell.knowledge_entry.deleted_at is None):
+    if not (isinstance(cell, (Cell, ObjectCell)) and cell.knowledge_entry and cell.knowledge_entry.deleted_at is None):
         for attachment in cell.attachments.filter_by(deleted_at=None).all():
             attachment.deleted_at = cell.deleted_at
     audit(action, cell, cell.kind)
@@ -553,21 +572,27 @@ def search():
     results = []
     if q:
         like = f"%{q}%"
+        from .display import search_excerpt
+
+        def matching_snippet(*values):
+            source = next((value for value in values if value and q.casefold() in value.casefold()), None)
+            return search_excerpt(source or next((value for value in values if value), ""), q)
+
         results.extend({"type": "板卡", "title": row.model or "未填写型号", "snippet": pcb_label(row, include_model=False), "url": url_for("main.pcb_detail", pcb_id=row.id)} for row in PCB.query.filter(PCB.deleted_at.is_(None), db.or_(PCB.serial.ilike(like), PCB.model.ilike(like))).limit(20))
-        results.extend({"type": "项目", "title": row.name, "snippet": row.objective[:200], "url": url_for("main.project_detail", project_id=row.id)} for row in Project.query.filter(Project.deleted_at.is_(None), db.or_(Project.name.ilike(like), Project.objective.ilike(like))).limit(20))
-        results.extend({"type": "问题", "title": row.title, "snippet": (row.description or row.current_summary)[:200], "url": url_for("main.issue_detail", issue_id=row.id)} for row in Issue.query.filter(Issue.deleted_at.is_(None), db.or_(Issue.title.ilike(like), Issue.description.ilike(like), Issue.tags.ilike(like))).limit(20))
-        results.extend({"type": "知识", "title": row.title, "snippet": row.content_md[:200], "url": url_for("knowledge.detail", entry_id=row.id)} for row in KnowledgeEntry.query.filter(KnowledgeEntry.deleted_at.is_(None), db.or_(KnowledgeEntry.title.ilike(like), KnowledgeEntry.content_md.ilike(like))).limit(20))
-        results.extend({"type": f"Cell · {row.kind}", "title": row.issue.title, "snippet": row.content_md[:200], "url": url_for("main.issue_detail", issue_id=row.issue_id)} for row in Cell.query.filter(Cell.deleted_at.is_(None), Cell.content_md.ilike(like)).limit(20))
+        results.extend({"type": "项目", "title": row.name, "snippet": matching_snippet(row.objective), "url": url_for("main.project_detail", project_id=row.id)} for row in Project.query.filter(Project.deleted_at.is_(None), db.or_(Project.name.ilike(like), Project.objective.ilike(like))).limit(20))
+        results.extend({"type": "问题", "title": row.title, "snippet": matching_snippet(row.description, row.tags, row.current_summary), "url": url_for("main.issue_detail", issue_id=row.id)} for row in Issue.query.filter(Issue.deleted_at.is_(None), db.or_(Issue.title.ilike(like), Issue.description.ilike(like), Issue.tags.ilike(like))).limit(20))
+        results.extend({"type": "知识", "title": row.title, "snippet": matching_snippet(row.content_md), "url": url_for("knowledge.detail", entry_id=row.id)} for row in KnowledgeEntry.query.filter(KnowledgeEntry.deleted_at.is_(None), db.or_(KnowledgeEntry.title.ilike(like), KnowledgeEntry.content_md.ilike(like))).limit(20))
+        results.extend({"type": f"Cell · {row.kind}", "title": row.issue.title, "snippet": matching_snippet(row.content_md), "url": url_for("main.issue_detail", issue_id=row.issue_id)} for row in Cell.query.filter(Cell.deleted_at.is_(None), Cell.content_md.ilike(like)).limit(20))
         object_cells = ObjectCell.query.filter(ObjectCell.deleted_at.is_(None), ObjectCell.content_md.ilike(like)).limit(20).all()
         results.extend({
             "type": f"Cell · {row.kind}",
             "title": row.pcb.model or row.pcb.serial,
-            "snippet": row.content_md[:200],
+            "snippet": matching_snippet(row.content_md),
             "url": url_for("main.pcb_detail", pcb_id=row.pcb_id),
         } if row.pcb_id else {
             "type": f"Cell · {row.kind}",
             "title": row.project.name,
-            "snippet": row.content_md[:200],
+            "snippet": matching_snippet(row.content_md),
             "url": url_for("main.project_detail", project_id=row.project_id),
         } for row in object_cells)
     return render_template("search.html", q=q, results=results[:20])

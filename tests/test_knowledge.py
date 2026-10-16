@@ -12,11 +12,12 @@ def test_knowledge_cell_is_searchable_and_keeps_an_issue_link(app, initialized_c
     assert "知识积累" in issue_page
 
     library = initialized_client.get("/knowledge?q=探头").get_data(as_text=True)
-    assert "示波器探头接地" in library
+    assert '示波器<mark class="search-match">探头</mark>接地' in library
     assert "接口干扰" in library
     assert "示波器探头接地" not in initialized_client.get("/knowledge?q=电源轨").get_data(as_text=True)
     assert "<script>" not in library
-    assert "示波器探头接地" in initialized_client.get("/search?q=探头").get_data(as_text=True)
+    global_search = initialized_client.get("/search?q=探头").get_data(as_text=True)
+    assert '示波器<mark class="search-match">探头</mark>接地' in global_search
     assert any(row["type"] == "knowledge" for row in initialized_client.get("/api/v1/search?q=探头").json)
 
     with app.app_context():

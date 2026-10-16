@@ -22,11 +22,13 @@ def upgrade_schema():
             return
         columns = {row[1] for row in connection.execute(text("PRAGMA table_info(issues)"))}
         attachment_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(attachments)"))} if "attachments" in tables else set()
+        knowledge_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(knowledge_entries)"))} if "knowledge_entries" in tables else set()
     need_resolved_at = "resolved_at" not in columns
     need_knowledge = "knowledge_entries" not in tables
     need_object_cells = "object_cells" not in tables
     need_object_cell_attachment = "attachments" in tables and "object_cell_id" not in attachment_columns
-    if need_resolved_at or need_knowledge or need_object_cells or need_object_cell_attachment:
+    need_knowledge_object_cell = "knowledge_entries" in tables and "source_object_cell_id" not in knowledge_columns
+    if need_resolved_at or need_knowledge or need_object_cells or need_object_cell_attachment or need_knowledge_object_cell:
         reasons = []
         if need_resolved_at:
             reasons.append("add issues.resolved_at")
@@ -36,6 +38,8 @@ def upgrade_schema():
             reasons.append("create object_cells")
         if need_object_cell_attachment:
             reasons.append("add attachments.object_cell_id")
+        if need_knowledge_object_cell:
+            reasons.append("add knowledge_entries.source_object_cell_id")
         _backup_before_upgrade(Path(engine.url.database), "; ".join(reasons))
     if need_resolved_at:
         with engine.begin() as connection:
@@ -55,6 +59,42 @@ def upgrade_schema():
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE attachments ADD COLUMN object_cell_id INTEGER REFERENCES object_cells(id)"))
             connection.execute(text("CREATE INDEX IF NOT EXISTS ix_attachments_object_cell_id ON attachments (object_cell_id)"))
+    if need_knowledge_object_cell:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE knowledge_entries ADD COLUMN source_object_cell_id INTEGER REFERENCES object_cells(id)"))
+            connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_knowledge_entries_source_object_cell_id ON knowledge_entries (source_object_cell_id)"))
+
+
+def upgrade_markdown_lists():
+    """Refresh cached HTML once so existing notes gain list rendering too."""
+    from .services import render_markdown
+
+    version = db.session.execute(
+        text("SELECT value FROM system_settings WHERE key = 'markdown_lists_version'")
+    ).scalar_one_or_none()
+    if version == "1":
+        return
+    changes = {}
+    for table in ("cells", "object_cells", "knowledge_entries", "daily_summaries"):
+        rows = db.session.execute(text(f"SELECT id, content_md, rendered_html FROM {table}")).all()
+        changed = []
+        for row_id, source, html in rows:
+            refreshed = render_markdown(source)
+            if refreshed != html:
+                changed.append((refreshed, row_id))
+        if changed:
+            changes[table] = changed
+    if changes and db.engine.dialect.name == "sqlite":
+        _backup_before_upgrade(Path(db.engine.url.database), "refresh cached Markdown lists")
+    for table, rows in changes.items():
+        db.session.execute(
+            text(f"UPDATE {table} SET rendered_html = :html WHERE id = :id"),
+            [{"html": html, "id": row_id} for html, row_id in rows],
+        )
+    db.session.execute(
+        text("INSERT INTO system_settings (key, value) VALUES ('markdown_lists_version', '1')")
+    )
+    db.session.commit()
 
 
 def _backup_before_upgrade(source_path: Path, reason: str):
