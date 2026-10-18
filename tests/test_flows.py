@@ -179,6 +179,24 @@ def test_markdown_table_is_rendered_and_sanitized():
     assert "<script>" not in render_markdown("<script>alert(1)</script>")
 
 
+def test_markdown_lists_render_after_prose_and_keep_code_literal():
+    from app.services import render_markdown
+
+    for marker in ("*", "-", "+"):
+        html = render_markdown(f"封装形式：\n{marker} 径向引线圆片式\n{marker} 表面贴装式")
+        assert "<ul>" in html
+        assert "<li>表面贴装式</li>" in html
+    for marker in (".", ")"):
+        html = render_markdown(f"选型步骤：\n1{marker} 工作电压\n2{marker} 钳位电压")
+        assert "<ol>" in html
+        assert "<li>钳位电压</li>" in html
+    html = render_markdown("- 主项\n    - 子项")
+    assert html.count("<ul>") == 2
+    html = render_markdown("```text\n* literal\n1) literal\n```")
+    assert "<ul>" not in html and "<ol>" not in html
+    assert "* literal" in html and "1) literal" in html
+
+
 def test_issue_cell_can_be_trashed_and_restored_with_attachment(app, initialized_client):
     initialized_client.post("/issues", data={"title": "可撤销的记录"})
     with app.app_context():

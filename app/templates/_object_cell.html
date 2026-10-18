@@ -5,9 +5,12 @@
       <strong>{{ cell.author.username if cell.author else 'ROOT' }}</strong>
       <time>{{ cell.created_at|cn_time('%m-%d %H:%M') }}</time>
       <span class="tag {{ 'orange' if cell.kind=='测试记录' else 'blue' }}">{{ cell.kind }}</span>
-      <form class="cell-delete-form" action="{{ url_for('main.project_cell_trash',project_id=cell.project_id,cell_id=cell.id) if cell.project_id else url_for('main.pcb_cell_trash',pcb_id=cell.pcb_id,cell_id=cell.id) }}" method="post" data-confirm="将这条 Cell 移入回收站？可在回收站恢复。"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="cell-delete-button" aria-label="删除 Cell {{ cell.id }}">删除</button></form>
+      <form class="cell-delete-form" action="{{ url_for('main.project_cell_trash',project_id=cell.project_id,cell_id=cell.id) if cell.project_id else url_for('main.pcb_cell_trash',pcb_id=cell.pcb_id,cell_id=cell.id) }}" method="post" data-confirm="{{ '将这条 Cell 移入回收站？独立知识条目会保留。' if cell.kind == '知识积累' else '将这条 Cell 移入回收站？可在回收站恢复。' }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="cell-delete-button" aria-label="删除 Cell {{ cell.id }}">删除</button></form>
     </div>
-    <div class="rich-content">{{ cell.rendered_html|safe }}</div>
+    {% if cell.kind == '知识积累' and cell.knowledge_entry %}
+    <a class="knowledge-cell-link" href="{{ url_for('knowledge.detail',entry_id=cell.knowledge_entry.id) }}"><strong>{{ cell.knowledge_entry.title }}</strong><small>打开知识条目 →</small></a>
+    <div class="rich-content">{{ cell.knowledge_entry.rendered_html|safe }}</div>
+    {% else %}<div class="rich-content">{{ cell.rendered_html|safe }}</div>{% endif %}
     {% if cell.attachments.filter_by(deleted_at=None).count() %}
     <div class="attachment-grid">
       {% for attachment in cell.attachments.filter_by(deleted_at=None).all() %}

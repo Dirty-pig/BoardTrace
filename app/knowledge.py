@@ -8,38 +8,51 @@ from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
 from .extensions import db
-from .models import Cell, Issue, KnowledgeEntry, utcnow
+from .models import Cell, Issue, KnowledgeEntry, ObjectCell, utcnow
 from .services import audit, render_markdown, save_attachment
 
 
 bp = Blueprint("knowledge", __name__)
 
 
-def create_entry(title, content, *, issue=None, files=(), create_cell=True):
+def create_entry(title, content, *, issue=None, project=None, pcb=None, files=(), create_cell=True):
     title = title.strip()
     content = content.strip()
     if not title or not content:
         raise ValueError("知识小标题和正文都不能为空。")
     if len(title) > 200 or len(content) > 50_000:
         raise ValueError("知识小标题最多 200 字，正文最多 50,000 字。")
+    if sum(source is not None for source in (issue, project, pcb)) > 1:
+        raise ValueError("知识只能关联一个来源对象。")
 
     cell = None
+    object_cell = None
     if issue is not None and create_cell:
         cell = Cell(
             issue=issue, kind="知识积累", content_md=title,
             rendered_html=render_markdown(title), author_id=current_user.id,
         )
         db.session.add(cell)
+    if (project is not None or pcb is not None) and create_cell:
+        object_cell = ObjectCell(
+            project=project, pcb=pcb, kind="知识积累", content_md=title,
+            rendered_html=render_markdown(title), author_id=current_user.id,
+        )
+        db.session.add(object_cell)
     if issue is not None:
         issue.updated_at = utcnow()
+    if project is not None:
+        project.updated_at = utcnow()
+    if pcb is not None:
+        pcb.updated_at = utcnow()
     entry = KnowledgeEntry(
         title=title, content_md=content, rendered_html=render_markdown(content),
-        source_issue=issue, source_cell=cell, author_id=current_user.id,
+        source_issue=issue, source_cell=cell, source_object_cell=object_cell, author_id=current_user.id,
     )
     db.session.add(entry)
     db.session.flush()
     for file in files:
-        save_attachment(file, issue=issue, cell=cell, pcb=issue.pcb if issue else None, user=current_user)
+        save_attachment(file, issue=issue, cell=cell, object_cell=object_cell, pcb=pcb or (issue.pcb if issue else None), user=current_user)
     audit("knowledge.create", entry, title)
     db.session.commit()
     return entry
@@ -95,7 +108,11 @@ def index():
     q = request.args.get("q", "").strip()[:100]
     issue_id = request.args.get("issue_id", type=int)
     issue_filter = Issue.query.filter_by(id=issue_id, deleted_at=None).first_or_404() if issue_id else None
-    query = KnowledgeEntry.query.options(joinedload(KnowledgeEntry.source_issue)).filter(KnowledgeEntry.deleted_at.is_(None))
+    query = KnowledgeEntry.query.options(
+        joinedload(KnowledgeEntry.source_issue),
+        joinedload(KnowledgeEntry.source_object_cell).joinedload(ObjectCell.project),
+        joinedload(KnowledgeEntry.source_object_cell).joinedload(ObjectCell.pcb),
+    ).filter(KnowledgeEntry.deleted_at.is_(None))
     if issue_filter:
         query = query.filter(KnowledgeEntry.source_issue_id == issue_filter.id)
     if q:
@@ -113,12 +130,17 @@ def index():
 def detail(entry_id):
     entry = KnowledgeEntry.query.filter_by(id=entry_id, deleted_at=None).first_or_404()
     issue = entry.source_issue if entry.source_issue and entry.source_issue.deleted_at is None else None
+    source_project = entry.source_object_cell.project if entry.source_object_cell else None
+    project = source_project if source_project and source_project.deleted_at is None else None
+    source_pcb = entry.source_object_cell.pcb if entry.source_object_cell else None
+    pcb = source_pcb if source_pcb and source_pcb.deleted_at is None else None
+    attachment_cell = entry.source_cell or entry.source_object_cell
     practice_cells = (
         issue.cells.filter(Cell.deleted_at.is_(None), Cell.kind.notin_(("知识积累", "状态变化")))
         .order_by(Cell.created_at.desc(), Cell.id.desc()).limit(8).all()
         if issue else []
     )
-    return render_template("knowledge/detail.html", entry=entry, issue=issue, practice_cells=practice_cells)
+    return render_template("knowledge/detail.html", entry=entry, issue=issue, project=project, pcb=pcb, attachment_cell=attachment_cell, practice_cells=practice_cells)
 
 
 @bp.post("/knowledge/<int:entry_id>/update")
@@ -131,6 +153,9 @@ def update(entry_id):
         flash("小标题和正文必填，且不能超过长度限制。", "error")
         return redirect(url_for("knowledge.detail", entry_id=entry.id))
     if "issue_ref" in request.form:
+        if entry.source_object_cell_id:
+            flash("来自项目或板卡 Cell 的知识需保留原始来源关联。", "error")
+            return redirect(url_for("knowledge.detail", entry_id=entry.id))
         try:
             issue = issue_from_reference(request.form.get("issue_ref", ""))
         except ValueError as exc:
@@ -146,6 +171,9 @@ def update(entry_id):
     if entry.source_cell:
         entry.source_cell.content_md = title
         entry.source_cell.rendered_html = render_markdown(title)
+    if entry.source_object_cell:
+        entry.source_object_cell.content_md = title
+        entry.source_object_cell.rendered_html = render_markdown(title)
     audit("knowledge.update", entry, title)
     db.session.commit()
     flash("知识已更新。", "success")

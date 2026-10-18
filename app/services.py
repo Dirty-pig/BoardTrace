@@ -42,6 +42,9 @@ ALLOWED_ATTRS = {
 }
 COLOR_PATTERN = re.compile(r"\[(red|orange|blue|green|gray)\](.*?)\[/\1\]", re.S)
 MARK_PATTERN = re.compile(r"==(.+?)==", re.S)
+LIST_MARKER = re.compile(r"^ {0,3}(?:[-+*]|\d+[.)]) +\S")
+ORDERED_PAREN_MARKER = re.compile(r"^( {0,3}\d+)\)( +\S.*)$")
+FENCE_MARKER = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 
 
 def ensure_defaults():
@@ -68,10 +71,41 @@ def set_setting(key, value):
 
 def render_markdown(source: str) -> str:
     source = source or ""
+    source = _normalize_lists(source)
     escaped_colors = COLOR_PATTERN.sub(lambda m: f'<span class="text-{m.group(1)}">{m.group(2)}</span>', source)
     escaped_colors = MARK_PATTERN.sub(r"<mark>\1</mark>", escaped_colors)
     html = markdown.markdown(escaped_colors, extensions=["tables", "fenced_code", "sane_lists", "nl2br"])
     return bleach.clean(html, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS, protocols={"http", "https", "mailto"}, strip=True)
+
+
+def _normalize_lists(source: str) -> str:
+    """Accept common list markers directly after prose, outside fenced code."""
+    lines = source.splitlines(keepends=True)
+    result = []
+    fence_char = None
+    fence_length = 0
+    previous_is_list = False
+    for line in lines:
+        plain = line.rstrip("\r\n")
+        fence = FENCE_MARKER.match(plain)
+        if fence:
+            marker = fence.group(1)
+            if fence_char is None:
+                fence_char, fence_length = marker[0], len(marker)
+            elif marker[0] == fence_char and len(marker) >= fence_length:
+                fence_char = None
+        if fence_char is None and not fence:
+            is_list = bool(LIST_MARKER.match(plain))
+            if is_list:
+                if result and result[-1].strip() and not previous_is_list:
+                    result.append("\n")
+                plain = ORDERED_PAREN_MARKER.sub(r"\1.\2", plain)
+                line = plain + line[len(line.rstrip("\r\n")):]
+            previous_is_list = is_list
+        else:
+            previous_is_list = False
+        result.append(line)
+    return "".join(result)
 
 
 def audit(action, entity=None, detail="", user_id=None):

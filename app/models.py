@@ -130,6 +130,7 @@ class ObjectCell(TimestampMixin, SoftDeleteMixin, db.Model):
     project = db.relationship("Project", back_populates="object_cells")
     author = db.relationship("User")
     attachments = db.relationship("Attachment", back_populates="object_cell", lazy="dynamic")
+    knowledge_entry = db.relationship("KnowledgeEntry", back_populates="source_object_cell", uselist=False)
 
     __table_args__ = (
         CheckConstraint(
@@ -148,9 +149,11 @@ class KnowledgeEntry(TimestampMixin, SoftDeleteMixin, db.Model):
     rendered_html = db.Column(db.Text, nullable=False, default="")
     source_issue_id = db.Column(db.Integer, db.ForeignKey("issues.id"), nullable=True, index=True)
     source_cell_id = db.Column(db.Integer, db.ForeignKey("cells.id"), nullable=True, unique=True)
+    source_object_cell_id = db.Column(db.Integer, db.ForeignKey("object_cells.id"), nullable=True, unique=True)
     author_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     source_issue = db.relationship("Issue")
     source_cell = db.relationship("Cell", back_populates="knowledge_entry")
+    source_object_cell = db.relationship("ObjectCell", back_populates="knowledge_entry")
     author = db.relationship("User")
 
 
