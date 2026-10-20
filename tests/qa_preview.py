@@ -34,6 +34,7 @@ with app.app_context():
         ("现象", "冷启动前 200ms 出现 **48mV** 峰值。"),
         ("测试记录", "[orange]更换 C37 后复测 10 次[/orange]，其中 1 次仍复现。"),
         ("下一步待办", "提高负载阶跃幅度，并记录示波器原始波形。"),
+        ("普通记录", "休眠命令 `shutdown /h`。\n\n```python\nprint('BoardTrace')\n```"),
     ]:
         db.session.add(Cell(issue=issue, kind=kind, content_md=content, rendered_html=render_markdown(content), author_id=root.id))
     db.session.add(ObjectCell(project=project, kind="阶段结论", content_md="两块样板已完成基础上电验证。", rendered_html=render_markdown("两块样板已完成基础上电验证。"), author_id=root.id))

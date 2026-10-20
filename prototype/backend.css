@@ -48,6 +48,10 @@
 .rich-content th, .rich-content td { border: 1px solid var(--line); padding: 7px 9px; }
 .rich-content pre { background: #15212d; color: #e9f1f8; padding: 12px; border-radius: 7px; overflow: auto; }
 .rich-content code { font-family: Consolas, monospace; }
+.rich-content :not(pre) > code { background: #edf2f7; border: 1px solid #dce5ef; border-radius: 4px; color: #1e4267; padding: .12em .35em; white-space: break-spaces; }
+.rich-content .codehilite { max-width: 100%; overflow: hidden; }
+.rich-content .codehilite pre { margin: 10px 0; background: #272822; color: #f8f8f2; line-height: 1.5; white-space: pre; overflow-x: auto; overflow-wrap: normal; }
+.composer-toolbar .code-button { width: 36px; flex: none; white-space: nowrap; font-size: 11px; }
 .text-red { color: var(--red); }.text-orange { color: var(--orange); }.text-blue { color: var(--blue); }.text-green { color: var(--green); }.text-gray { color: var(--muted); }
 .hidden { display: none; }
 .edit-summary textarea { width: 100%; min-height: 300px; border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 10px; }

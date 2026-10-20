@@ -130,6 +130,15 @@
     editor.focus();
   }
   $$('[data-editor-wrap]').forEach(button => button.addEventListener('click', () => wrapSelection(button.dataset.editorWrap)));
+  $$('[data-editor-code-block]').forEach(button => button.addEventListener('click', () => {
+    if (!editor) return;
+    const start = editor.selectionStart, end = editor.selectionEnd;
+    const selected = editor.value.slice(start, end) || '在这里粘贴代码';
+    const prefix = start > 0 && editor.value[start - 1] !== '\n' ? '\n' : '';
+    const suffix = end < editor.value.length && editor.value[end] !== '\n' ? '\n' : '';
+    editor.setRangeText(`${prefix}\`\`\`text\n${selected}\n\`\`\`${suffix}`, start, end, 'end');
+    editor.focus();
+  }));
   $$('[data-editor-color]').forEach(button => button.addEventListener('click', () => wrapSelection(`[${button.dataset.editorColor}]`, `[/${button.dataset.editorColor}]`)));
 
   const attachmentInput = $('#attachmentInput');

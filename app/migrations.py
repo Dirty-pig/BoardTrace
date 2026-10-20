@@ -67,10 +67,19 @@ def upgrade_schema():
 
 def upgrade_markdown_lists():
     """Refresh cached HTML once so existing notes gain list rendering too."""
+    _refresh_markdown_html("markdown_lists_version", "refresh cached Markdown lists")
+
+
+def upgrade_markdown_code():
+    """Refresh existing notes for syntax-highlighted code blocks."""
+    _refresh_markdown_html("markdown_code_version", "refresh cached Markdown code")
+
+
+def _refresh_markdown_html(setting_key: str, reason: str):
     from .services import render_markdown
 
     version = db.session.execute(
-        text("SELECT value FROM system_settings WHERE key = 'markdown_lists_version'")
+        text("SELECT value FROM system_settings WHERE key = :key"), {"key": setting_key}
     ).scalar_one_or_none()
     if version == "1":
         return
@@ -85,14 +94,14 @@ def upgrade_markdown_lists():
         if changed:
             changes[table] = changed
     if changes and db.engine.dialect.name == "sqlite":
-        _backup_before_upgrade(Path(db.engine.url.database), "refresh cached Markdown lists")
+        _backup_before_upgrade(Path(db.engine.url.database), reason)
     for table, rows in changes.items():
         db.session.execute(
             text(f"UPDATE {table} SET rendered_html = :html WHERE id = :id"),
             [{"html": html, "id": row_id} for html, row_id in rows],
         )
     db.session.execute(
-        text("INSERT INTO system_settings (key, value) VALUES ('markdown_lists_version', '1')")
+        text("INSERT INTO system_settings (key, value) VALUES (:key, '1')"), {"key": setting_key}
     )
     db.session.commit()
 

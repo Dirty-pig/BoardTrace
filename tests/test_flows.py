@@ -197,6 +197,19 @@ def test_markdown_lists_render_after_prose_and_keep_code_literal():
     assert "* literal" in html and "1) literal" in html
 
 
+def test_inline_code_and_fenced_language_highlighting_stay_sanitized():
+    from app.services import render_markdown
+
+    inline = render_markdown("运行 `shutdown /h`，不要把命令当作普通文本。")
+    assert "<code>shutdown /h</code>" in inline
+    fenced = render_markdown("```python\nprint(1)\n```")
+    assert '<div class="codehilite">' in fenced
+    assert '<span class="nb">print</span>' in fenced
+    assert "<script>" not in render_markdown("```html\n<script>alert(1)</script>\n```")
+    assert "[red]x[/red]" in render_markdown("`[red]x[/red]`")
+    assert "&lt;mark&gt;" not in render_markdown("```python\nvalue = '==x=='\n```")
+
+
 def test_issue_cell_can_be_trashed_and_restored_with_attachment(app, initialized_client):
     initialized_client.post("/issues", data={"title": "可撤销的记录"})
     with app.app_context():
