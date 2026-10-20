@@ -22,6 +22,27 @@ def test_existing_markdown_html_is_refreshed_without_changing_note_timestamp(app
         assert list((tmp_path / "backups").glob("schema-*/app.db"))
 
 
+def test_existing_code_block_html_is_refreshed_once(app, tmp_path):
+    from app.extensions import db
+    from app.migrations import upgrade_markdown_code
+    from app.models import DailySummary, SystemSetting
+
+    with app.app_context():
+        note = DailySummary(content_md="```python\nprint(1)\n```", rendered_html="<pre><code>print(1)</code></pre>")
+        db.session.add(note)
+        db.session.delete(db.session.get(SystemSetting, "markdown_code_version"))
+        db.session.commit()
+        original_updated_at = note.updated_at
+        upgrade_markdown_code()
+        db.session.refresh(note)
+        assert '<div class="codehilite">' in note.rendered_html
+        assert note.updated_at == original_updated_at
+        backups = list((tmp_path / "backups").glob("schema-*/app.db"))
+        assert backups
+        upgrade_markdown_code()
+        assert list((tmp_path / "backups").glob("schema-*/app.db")) == backups
+
+
 def test_existing_database_gets_object_cell_schema_and_backup(tmp_path):
     database = tmp_path / "legacy.db"
     with sqlite3.connect(database) as connection:

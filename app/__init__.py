@@ -77,11 +77,12 @@ def create_app(test_config=None):
         return "上传总量超过 100MB，请减少文件数量或压缩后重试。", 413
 
     with app.app_context():
-        from .migrations import upgrade_markdown_lists, upgrade_schema
+        from .migrations import upgrade_markdown_code, upgrade_markdown_lists, upgrade_schema
         upgrade_schema()
         db.create_all()
         from .services import ensure_defaults
         ensure_defaults()
         upgrade_markdown_lists()
+        upgrade_markdown_code()
 
     return app

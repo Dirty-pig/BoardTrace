@@ -33,11 +33,12 @@ DEFAULT_SETTINGS = {
 ALLOWED_TAGS = {
     "p", "br", "strong", "em", "code", "pre", "blockquote", "ul", "ol", "li",
     "a", "table", "thead", "tbody", "tr", "th", "td", "h1", "h2", "h3", "hr",
-    "span", "mark", "input",
+    "span", "mark", "input", "div",
 }
 ALLOWED_ATTRS = {
     "a": ["href", "title", "target", "rel"],
     "span": ["class"],
+    "div": ["class"],
     "input": ["type", "checked", "disabled"],
 }
 COLOR_PATTERN = re.compile(r"\[(red|orange|blue|green|gray)\](.*?)\[/\1\]", re.S)
@@ -45,6 +46,7 @@ MARK_PATTERN = re.compile(r"==(.+?)==", re.S)
 LIST_MARKER = re.compile(r"^ {0,3}(?:[-+*]|\d+[.)]) +\S")
 ORDERED_PAREN_MARKER = re.compile(r"^( {0,3}\d+)\)( +\S.*)$")
 FENCE_MARKER = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+INLINE_CODE = re.compile(r"(`+)(.+?)\1", re.S)
 
 
 def ensure_defaults():
@@ -72,10 +74,47 @@ def set_setting(key, value):
 def render_markdown(source: str) -> str:
     source = source or ""
     source = _normalize_lists(source)
-    escaped_colors = COLOR_PATTERN.sub(lambda m: f'<span class="text-{m.group(1)}">{m.group(2)}</span>', source)
-    escaped_colors = MARK_PATTERN.sub(r"<mark>\1</mark>", escaped_colors)
-    html = markdown.markdown(escaped_colors, extensions=["tables", "fenced_code", "sane_lists", "nl2br"])
+    escaped_colors = _render_text_marks(source)
+    html = markdown.markdown(
+        escaped_colors,
+        extensions=["tables", "fenced_code", "codehilite", "sane_lists", "nl2br"],
+        extension_configs={"codehilite": {"guess_lang": False}},
+    )
     return bleach.clean(html, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS, protocols={"http", "https", "mailto"}, strip=True)
+
+
+def _render_text_marks(source: str) -> str:
+    """Apply custom colors and marks only outside Markdown code spans and fences."""
+    def plain(text_value):
+        colored = COLOR_PATTERN.sub(lambda m: f'<span class="text-{m.group(1)}">{m.group(2)}</span>', text_value)
+        return MARK_PATTERN.sub(r"<mark>\1</mark>", colored)
+
+    def outside_fences(text_value):
+        parts, previous = [], 0
+        for match in INLINE_CODE.finditer(text_value):
+            parts.extend((plain(text_value[previous:match.start()]), match.group()))
+            previous = match.end()
+        parts.append(plain(text_value[previous:]))
+        return "".join(parts)
+
+    result, prose = [], []
+    fence_char, fence_length = None, 0
+    for line in source.splitlines(keepends=True):
+        marker_match = FENCE_MARKER.match(line)
+        if fence_char is None and marker_match:
+            result.append(outside_fences("".join(prose)))
+            prose.clear()
+            marker = marker_match.group(1)
+            fence_char, fence_length = marker[0], len(marker)
+            result.append(line)
+        elif fence_char is not None:
+            result.append(line)
+            if marker_match and marker_match.group(1)[0] == fence_char and len(marker_match.group(1)) >= fence_length:
+                fence_char = None
+        else:
+            prose.append(line)
+    result.append(outside_fences("".join(prose)))
+    return "".join(result)
 
 
 def _normalize_lists(source: str) -> str:
